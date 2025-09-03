@@ -20,6 +20,13 @@
 - **File watching**: Support .dot, .puml, .plantuml, .mermaid files
 - **Rendering**: SVG preferred, PNG fallback via Kroki service
 
+## TDD Development Process
+- **Red-Green-Refactor**: Write failing test, implement minimal code, refactor
+- **Test First**: Write unit tests before implementing each component
+- **Mock External**: Mock Kroki API, file system, GUI components in tests
+- **Manual Validation**: GUI interactions and file watching require manual testing after automated tests pass
+- **Documentation**: Update PLAN.md checkboxes and README.md as features are completed
+
 ## Project Structure
 - Minimal structure: main.py entry point, pyproject.toml for dependencies
 - Target: MacOS desktop application for diagram-as-code file watching
