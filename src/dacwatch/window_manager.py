@@ -57,15 +57,15 @@ class DiagramWindow(QMainWindow):
         if format not in ["svg", "png"]:
             raise ValueError("Format must be 'svg' or 'png'")
 
-        # Create image label
-        from PySide6.QtWidgets import QLabel
+        # Create image label and scroll area
+        from PySide6.QtWidgets import QLabel, QScrollArea
         from PySide6.QtGui import QPixmap
         from PySide6.QtCore import QByteArray
 
         image_label = QLabel()
         image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        # Create pixmap from image data
+        # Create pixmap from image data (always full size)
         pixmap = QPixmap()
         if format == "svg":
             # For SVG, convert bytes to QByteArray
@@ -74,47 +74,38 @@ class DiagramWindow(QMainWindow):
         else:  # PNG
             pixmap.loadFromData(image_data)
 
-        # Auto-scale the image if it's larger than the window
-        window_width = self.width()
-        window_height = self.height()
-        image_width = pixmap.width()
-        image_height = pixmap.height()
-
-        # Calculate scale factors
-        width_scale = window_width / image_width if image_width > 0 else 1.0
-        height_scale = window_height / image_height if image_height > 0 else 1.0
-        scale_factor = min(width_scale, height_scale)
-
-        if scale_factor < 1.0:
-            # Image is larger than window, scale it down
-            new_width = int(image_width * scale_factor)
-            new_height = int(image_height * scale_factor)
-            pixmap = pixmap.scaled(new_width, new_height, Qt.AspectRatioMode.KeepAspectRatio)
-            image_label.setScaledContents(True)
-        else:
-            # Image fits in window, don't scale
-            image_label.setScaledContents(False)
-
-        # Set pixmap on label
+        # Set pixmap on label (full size)
         image_label.setPixmap(pixmap)
+        image_label.setScaledContents(False)
+        image_label.resize(pixmap.size())
+
+        # Create scroll area to contain the image
+        scroll_area = QScrollArea()
+        scroll_area.setWidget(image_label)
+        scroll_area.setWidgetResizable(False)  # Don't resize the widget inside
+        scroll_area.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         # Update format label
         if self.format_label:
             self.format_label.setText(f"Format: {format.upper()}")
             self.format_label.show()
 
-        # Replace loading label with image
+        # Replace loading label with scroll area containing image
         central_widget = self.centralWidget()
         if central_widget:
             layout = central_widget.layout()
             if layout and self.loading_label:
                 layout.removeWidget(self.loading_label)
                 self.loading_label.hide()
+            # Remove existing image if present
+            if hasattr(self, 'scroll_area') and self.scroll_area and layout:
+                layout.removeWidget(self.scroll_area)
             if layout:
-                layout.addWidget(image_label)
+                layout.addWidget(scroll_area)
 
-        # Store reference to image label for potential future use
+        # Store references for potential future use
         self.image_label = image_label
+        self.scroll_area = scroll_area
 
     def _setup_toolbar(self):
         """Setup the toolbar with action buttons."""
