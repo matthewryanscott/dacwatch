@@ -54,9 +54,10 @@ class FileWatcher:
 
         # Event queue for debouncing
         self.event_queue = asyncio.Queue()
-        self.pending_events: Dict[str, Dict[str, Any]] = {}
-        self.debounce_delay = 0.5  # seconds
+        self.pending_events: Dict[str, Set[str]] = {}  # file_path -> set of event types
+        self.debounce_delay = 1.0  # seconds
         self.processing_task = None
+        self.debounce_task: Optional[asyncio.Task] = None  # Task for debounce timer
 
     async def start(self):
         """Start watching the directory."""
@@ -92,6 +93,14 @@ class FileWatcher:
             except asyncio.CancelledError:
                 pass
 
+        # Stop any pending debounce task
+        if self.debounce_task and not self.debounce_task.done():
+            self.debounce_task.cancel()
+            try:
+                await self.debounce_task
+            except asyncio.CancelledError:
+                pass
+
     async def handle_file_event(self, event: Dict[str, Any]):
         """Handle a file system event by queuing it for processing."""
         file_path = Path(event['src_path'])
@@ -107,43 +116,72 @@ class FileWatcher:
         """Process events from the queue with debouncing."""
         while self.is_watching:
             try:
-                # Wait for an event or timeout
-                event = await asyncio.wait_for(self.event_queue.get(), timeout=0.1)
+                # Wait for an event
+                event = await self.event_queue.get()
                 file_path = event['src_path']
+                event_type = event['event_type']
 
-                # Update pending events (debounce by overwriting with latest event)
-                self.pending_events[file_path] = event
+                # Update pending events (accumulate event types for each file)
+                if file_path not in self.pending_events:
+                    self.pending_events[file_path] = set()
+                self.pending_events[file_path].add(event_type)
 
-                # Process pending events after debounce delay
-                await self._debounce_and_process()
+                # Schedule processing after debounce delay
+                await self._schedule_debounce_processing()
 
-            except asyncio.TimeoutError:
-                # No events in queue, process any pending events
-                if self.pending_events:
-                    await self._debounce_and_process()
             except asyncio.CancelledError:
                 break
 
+    async def _schedule_debounce_processing(self):
+        """Schedule event processing after debounce delay."""
+        # Cancel any existing debounce task
+        if self.debounce_task and not self.debounce_task.done():
+            self.debounce_task.cancel()
+
+        # Schedule new debounce task
+        self.debounce_task = asyncio.create_task(self._debounce_and_process())
+
     async def _debounce_and_process(self):
-        """Process pending events after debounce delay."""
+        """Process pending events after debounce delay has passed."""
+        try:
+            # Wait for debounce delay
+            await asyncio.sleep(self.debounce_delay)
+        except asyncio.CancelledError:
+            # Debounce was cancelled due to new events, don't process yet
+            return
+
         if not self.pending_events:
             return
 
-        # Wait for debounce delay
-        await asyncio.sleep(self.debounce_delay)
-
         # Process all pending events
-        for file_path, event in self.pending_events.items():
-            await self._process_single_event(event)
+        for file_path, event_types in self.pending_events.items():
+            flattened_event = self._flatten_events(event_types)
+            if flattened_event:
+                await self._process_single_event(flattened_event, file_path)
 
         # Clear pending events
         self.pending_events.clear()
 
-    async def _process_single_event(self, event: Dict[str, Any]):
+    def _flatten_events(self, event_types: Set[str]) -> Optional[str]:
+        """Flatten multiple event types into a single meaningful event."""
+        if 'deleted' in event_types:
+            # If file was deleted, that's the final event regardless of others
+            return 'deleted'
+        elif 'created' in event_types:
+            # If file was created (and possibly modified), treat as created
+            return 'created'
+        elif 'modified' in event_types:
+            # Only modified events
+            return 'modified'
+        else:
+            # No valid events
+            return None
+
+    async def _process_single_event(self, event_type: str, file_path: str):
         """Process a single file event."""
-        file_path = Path(event['src_path'])
+        file_path_obj = Path(file_path)
 
         # For now, just print the event
-        print(f"Processed file event: {event['event_type']} - {file_path}")
+        print(f"Processed file event: {event_type} - {file_path_obj}")
 
         # TODO: Process the event (e.g., trigger diagram rendering)

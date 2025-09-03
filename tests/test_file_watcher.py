@@ -254,6 +254,10 @@ async def test_file_watcher_event_queue_debouncing(tmp_path):
     config = Config(directory=directory)
 
     watcher = FileWatcher(config)
+
+    # Check that debounce delay is 1 second
+    assert watcher.debounce_delay == 1.0
+
     await watcher.start()
 
     test_file = directory / "test.dot"
@@ -310,3 +314,125 @@ async def test_file_watcher_multiple_files(tmp_path):
     await watcher.stop()
 
     # The test passes if no exceptions are raised
+
+
+@pytest.mark.asyncio
+async def test_file_watcher_event_flattening_created_modified(tmp_path):
+    """Test that {created, modified} events are flattened to {created}."""
+    directory = tmp_path / "test_dir"
+    directory.mkdir()
+    config = Config(directory=directory)
+
+    watcher = FileWatcher(config)
+    await watcher.start()
+
+    test_file = directory / "test.dot"
+
+    # Simulate created followed by modified
+    await watcher.handle_file_event({
+        'event_type': 'created',
+        'src_path': str(test_file),
+        'is_directory': False
+    })
+    await watcher.handle_file_event({
+        'event_type': 'modified',
+        'src_path': str(test_file),
+        'is_directory': False
+    })
+
+    # Wait for processing
+    await asyncio.sleep(watcher.debounce_delay + 0.1)
+
+    await watcher.stop()
+
+    # The test passes if no exceptions are raised
+
+
+@pytest.mark.asyncio
+async def test_file_watcher_event_flattening_modified_deleted(tmp_path):
+    """Test that {modified, deleted} events are flattened to {deleted}."""
+    directory = tmp_path / "test_dir"
+    directory.mkdir()
+    config = Config(directory=directory)
+
+    watcher = FileWatcher(config)
+    await watcher.start()
+
+    test_file = directory / "test.dot"
+
+    # Simulate modified followed by deleted
+    await watcher.handle_file_event({
+        'event_type': 'modified',
+        'src_path': str(test_file),
+        'is_directory': False
+    })
+    await watcher.handle_file_event({
+        'event_type': 'deleted',
+        'src_path': str(test_file),
+        'is_directory': False
+    })
+
+    # Wait for processing
+    await asyncio.sleep(watcher.debounce_delay + 0.1)
+
+    await watcher.stop()
+
+    # The test passes if no exceptions are raised
+
+
+@pytest.mark.asyncio
+async def test_file_watcher_event_flattening_created_deleted(tmp_path):
+    """Test that {created, deleted} events are flattened to {deleted}."""
+    directory = tmp_path / "test_dir"
+    directory.mkdir()
+    config = Config(directory=directory)
+
+    watcher = FileWatcher(config)
+    await watcher.start()
+
+    test_file = directory / "test.dot"
+
+    # Simulate created followed by deleted
+    await watcher.handle_file_event({
+        'event_type': 'created',
+        'src_path': str(test_file),
+        'is_directory': False
+    })
+    await watcher.handle_file_event({
+        'event_type': 'deleted',
+        'src_path': str(test_file),
+        'is_directory': False
+    })
+
+    # Wait for processing
+    await asyncio.sleep(watcher.debounce_delay + 0.1)
+
+    await watcher.stop()
+
+    # The test passes if no exceptions are raised
+
+
+def test_file_watcher_flatten_events_method():
+    """Test the _flatten_events method directly."""
+    from dacwatch.file_watcher import FileWatcher
+    from dacwatch.config import Config
+    from pathlib import Path
+
+    # Create a temporary config for the test
+    tmp_path = Path("/tmp")
+    config = Config(directory=tmp_path)
+    watcher = FileWatcher(config)
+
+    # Test various event combinations
+    assert watcher._flatten_events({'created'}) == 'created'
+    assert watcher._flatten_events({'modified'}) == 'modified'
+    assert watcher._flatten_events({'deleted'}) == 'deleted'
+
+    assert watcher._flatten_events({'created', 'modified'}) == 'created'
+    assert watcher._flatten_events({'modified', 'deleted'}) == 'deleted'
+    assert watcher._flatten_events({'created', 'deleted'}) == 'deleted'
+
+    assert watcher._flatten_events({'created', 'modified', 'deleted'}) == 'deleted'
+
+    # Test empty set
+    assert watcher._flatten_events(set()) is None
