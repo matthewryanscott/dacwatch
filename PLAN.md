@@ -3,6 +3,13 @@
 ## Documentation Updates
 **IMPORTANT**: When completing any task below, update the corresponding checkboxes in this PLAN.md and update README.md if new features/usage patterns are added.
 
+## Development Process
+**STOP AND WAIT**: After completing each phase, the agent MUST stop and wait for manual review and commit before proceeding to the next phase. This allows for:
+- Code review and quality checks
+- Manual testing of implemented features
+- Git commits with meaningful messages
+- Opportunity to pause or redirect development
+
 ## Phase 1: Core Infrastructure (TDD)
 - [x] **CLI Argument Parser**: Write tests for Typer CLI argument parsing, then implement
 - [x] **Configuration**: Test config object creation/validation, then implement

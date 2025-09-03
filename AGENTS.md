@@ -27,6 +27,13 @@
 - **Manual Validation**: GUI interactions and file watching require manual testing after automated tests pass
 - **Documentation**: Update PLAN.md checkboxes and README.md as features are completed
 
+## Development Workflow
+**STOP AND WAIT**: After completing each phase from PLAN.md, the agent MUST stop and wait for manual review and commit before proceeding to the next phase. This allows for:
+- Code review and quality checks
+- Manual testing of implemented features
+- Git commits with meaningful messages
+- Opportunity to pause or redirect development
+
 ## Project Structure
 - Minimal structure: main.py entry point, pyproject.toml for dependencies
 - Target: MacOS desktop application for diagram-as-code file watching
