@@ -110,6 +110,10 @@ class DiagramWindow(QMainWindow):
         scroll_area.setWidget(image_label)
         scroll_area.setWidgetResizable(True)
         scroll_area.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        
+        # Set white background for the scroll area and image label
+        scroll_area.setStyleSheet("QScrollArea { background-color: white; }")
+        image_label.setStyleSheet("QLabel { background-color: white; }")
 
         # Update format label
         if self.format_label:
