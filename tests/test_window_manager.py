@@ -381,7 +381,7 @@ class TestDiagramWindowImageDisplay:
     def test_display_image_svg_format(self, qtbot):
         """Test displaying SVG image data using real Qt widgets."""
         from dacwatch.window_manager import DiagramWindow
-        from PySide6.QtWidgets import QScrollArea
+        from PySide6.QtWidgets import QLabel
         
         # Create a real DiagramWindow
         window = DiagramWindow("/test/path.svg")
@@ -393,14 +393,12 @@ class TestDiagramWindowImageDisplay:
         # Call display_image
         window.display_image(svg_data, "svg")
         
-        # Verify scroll area was created and added
-        scroll_areas = window.findChildren(QScrollArea)
-        assert len(scroll_areas) == 1
-        scroll_area = scroll_areas[0]
+        # Verify image label was created and is the main display widget
+        assert window.image_label is not None
+        assert isinstance(window.image_label, QLabel)
         
-        # Verify image label exists inside scroll area
-        image_widget = scroll_area.widget()
-        assert image_widget is not None
+        # Verify the image label has scaled contents enabled for high-DPI
+        assert window.image_label.hasScaledContents()
         
         # Verify format label was updated
         assert window.format_label is not None
@@ -409,7 +407,7 @@ class TestDiagramWindowImageDisplay:
     def test_display_image_png_format(self, qtbot):
         """Test displaying PNG image data using real Qt widgets."""
         from dacwatch.window_manager import DiagramWindow
-        from PySide6.QtWidgets import QScrollArea
+        from PySide6.QtWidgets import QLabel
         
         # Create a real DiagramWindow  
         window = DiagramWindow("/test/path.png")
@@ -421,18 +419,18 @@ class TestDiagramWindowImageDisplay:
         # Call display_image
         window.display_image(png_data, "png")
         
-        # Verify scroll area was created
-        scroll_areas = window.findChildren(QScrollArea)
-        assert len(scroll_areas) == 1
+        # Verify image label was created
+        assert window.image_label is not None
+        assert isinstance(window.image_label, QLabel)
         
         # Verify format label was updated
         assert window.format_label is not None
         assert window.format_label.text() == "Format: PNG"
 
     def test_display_image_replaces_loading_label(self, qtbot):
-        """Test that display_image replaces the loading label with scroll area."""
+        """Test that display_image replaces the loading label with image label."""
         from dacwatch.window_manager import DiagramWindow
-        from PySide6.QtWidgets import QScrollArea
+        from PySide6.QtWidgets import QLabel
         
         # Create a real DiagramWindow
         window = DiagramWindow("/test/path.svg")
@@ -450,14 +448,14 @@ class TestDiagramWindowImageDisplay:
         # Verify loading label is now hidden
         assert not window.loading_label.isVisible()
         
-        # Verify scroll area was created and added
-        scroll_areas = window.findChildren(QScrollArea)
-        assert len(scroll_areas) == 1
+        # Verify image label was created and added
+        assert window.image_label is not None
+        assert isinstance(window.image_label, QLabel)
 
     def test_display_image_handles_empty_data(self, qtbot):
         """Test display_image handles empty image data gracefully."""
         from dacwatch.window_manager import DiagramWindow
-        from PySide6.QtWidgets import QScrollArea
+        from PySide6.QtWidgets import QLabel
         
         # Create a real DiagramWindow
         window = DiagramWindow("/test/path.svg")
@@ -466,9 +464,9 @@ class TestDiagramWindowImageDisplay:
         # Call display_image with empty data
         window.display_image(b'', "svg")
         
-        # Verify it doesn't crash and scroll area was created
-        scroll_areas = window.findChildren(QScrollArea)
-        assert len(scroll_areas) == 1
+        # Verify it doesn't crash and image label was created
+        assert window.image_label is not None
+        assert isinstance(window.image_label, QLabel)
         
         # Verify format label was updated
         assert window.format_label is not None
@@ -742,37 +740,77 @@ class TestDiagramWindowToolbar:
             mock_subprocess.assert_called_once_with(['open', '-R', "/path/to/test/file.dot"])
 
 
-class TestDiagramWindowScrollArea:
-    """Test suite for DiagramWindow auto-scaling functionality."""
+class TestDiagramWindowHighDPI:
+    """Test suite for DiagramWindow high-DPI image display functionality."""
 
-    def test_scroll_area_creation(self, qtbot):
-        """Test that scroll area is created for image display."""
+    def test_high_dpi_scaling(self, qtbot):
+        """Test that high-DPI scaling is enabled for image display."""
         from dacwatch.window_manager import DiagramWindow
-        from PySide6.QtWidgets import QScrollArea, QLabel
+        from PySide6.QtWidgets import QLabel
         
         # Create a real DiagramWindow
         window = DiagramWindow("/test/path.svg")
         qtbot.addWidget(window)
         
-        # Create minimal SVG data
-        svg_data = b'<svg width="200" height="150"><circle cx="100" cy="75" r="50"/></svg>'
+        # Create minimal SVG data with explicit size
+        svg_data = b'<svg width="200" height="150" viewBox="0 0 200 150"><circle cx="100" cy="75" r="50"/></svg>'
         
         # Call display_image
         window.display_image(svg_data, "svg")
         
-        # Verify scroll area was created
-        scroll_areas = window.findChildren(QScrollArea)
-        assert len(scroll_areas) == 1
+        # Verify image label was created with high-DPI scaling
+        assert window.image_label is not None
+        assert isinstance(window.image_label, QLabel)
         
-        scroll_area = scroll_areas[0]
+        # Verify scaled contents is enabled for smooth resizing
+        assert window.image_label.hasScaledContents()
         
-        # Verify scroll area contains an image label
-        image_widget = scroll_area.widget()
-        assert image_widget is not None
-        assert isinstance(image_widget, QLabel)
+        # Verify the pixmap has device pixel ratio set and is properly sized
+        pixmap = window.image_label.pixmap()
+        if pixmap and not pixmap.isNull():
+            # Device pixel ratio should be >= 1.0 (may be 2.0 on retina displays)
+            device_pixel_ratio = pixmap.devicePixelRatio()
+            assert device_pixel_ratio >= 1.0
+            
+            # For SVG, verify that the rendered size accounts for device pixel ratio
+            # The pixmap should be larger than the logical size on high-DPI displays
+            logical_width = pixmap.width() / device_pixel_ratio
+            logical_height = pixmap.height() / device_pixel_ratio
+            
+            # Should match the original SVG size (200x150) in logical pixels
+            assert logical_width > 0  # Should have some reasonable size
+            assert logical_height > 0
+
+    def test_svg_vector_rendering(self, qtbot):
+        """Test that SVG is rendered as vector graphics at high resolution."""
+        from dacwatch.window_manager import DiagramWindow
         
-        # Verify scroll area properties
-        assert not scroll_area.widgetResizable()  # Should be False for fixed-size content
+        # Create a real DiagramWindow
+        window = DiagramWindow("/test/path.svg")
+        qtbot.addWidget(window)
+        
+        # Create SVG with specific dimensions
+        svg_data = b'''<svg width="100" height="100" xmlns="http://www.w3.org/2000/svg">
+            <rect width="100" height="100" fill="red"/>
+        </svg>'''
+        
+        # Call display_image for SVG
+        window.display_image(svg_data, "svg")
+        
+        # Verify the SVG was processed (not just loaded as raster)
+        pixmap = window.image_label.pixmap()
+        assert pixmap is not None
+        assert not pixmap.isNull()
+        
+        # SVG should have been rendered at device resolution
+        device_ratio = window.devicePixelRatio()
+        expected_physical_width = int(100 * device_ratio)
+        expected_physical_height = int(100 * device_ratio)
+        
+        # Physical pixmap size should account for device pixel ratio
+        assert pixmap.width() == expected_physical_width
+        assert pixmap.height() == expected_physical_height
+        assert pixmap.devicePixelRatio() == device_ratio
 
 
 

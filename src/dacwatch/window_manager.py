@@ -45,7 +45,7 @@ class DiagramWindow(QMainWindow):
 
     def display_image(self, image_data: bytes, format: str):
         """
-        Display rendered diagram image in the window.
+        Display rendered diagram image in the window with high-DPI scaling.
 
         Args:
             image_data: The image data as bytes
@@ -57,40 +57,70 @@ class DiagramWindow(QMainWindow):
         if format not in ["svg", "png"]:
             raise ValueError("Format must be 'svg' or 'png'")
 
-        # Create image label and scroll area
-        from PySide6.QtWidgets import QLabel, QScrollArea
-        from PySide6.QtGui import QPixmap
-        from PySide6.QtCore import QByteArray
+        # Create image label with high-DPI scaling
+        from PySide6.QtWidgets import QLabel
+        from PySide6.QtGui import QPixmap, QPainter
+        from PySide6.QtCore import QByteArray, QSize
+        from PySide6.QtSvg import QSvgRenderer
 
         image_label = QLabel()
         image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
-        # Create pixmap from image data (always full size)
-        pixmap = QPixmap()
+        # Get device pixel ratio for high-DPI displays (2x for Retina)
+        device_pixel_ratio = self.devicePixelRatio()
+
+        # Create pixmap from image data
         if format == "svg":
-            # For SVG, convert bytes to QByteArray
+            # For SVG, use QSvgRenderer to render at optimal size
             byte_array = QByteArray(image_data)
-            pixmap.loadFromData(byte_array)
+            svg_renderer = QSvgRenderer(byte_array)
+            
+            if svg_renderer.isValid():
+                # Get the default size from SVG or use reasonable defaults
+                default_size = svg_renderer.defaultSize()
+                if default_size.isEmpty() or default_size.width() <= 0 or default_size.height() <= 0:
+                    # Fallback to reasonable default size if SVG doesn't specify
+                    default_size = QSize(800, 600)
+                
+                # Calculate display size considering device pixel ratio for crisp rendering
+                display_width = int(default_size.width() * device_pixel_ratio)
+                display_height = int(default_size.height() * device_pixel_ratio)
+                
+                # Create high-resolution pixmap
+                pixmap = QPixmap(display_width, display_height)
+                pixmap.fill(Qt.GlobalColor.transparent)  # Transparent background
+                
+                # Render SVG to pixmap at high resolution
+                painter = QPainter(pixmap)
+                painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+                painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+                svg_renderer.render(painter)
+                painter.end()
+                
+                # Set device pixel ratio so Qt knows this is a high-DPI image
+                pixmap.setDevicePixelRatio(device_pixel_ratio)
+            else:
+                # Fallback if SVG is invalid
+                pixmap = QPixmap()
         else:  # PNG
+            pixmap = QPixmap()
             pixmap.loadFromData(image_data)
+            # Set device pixel ratio on PNG pixmap to enable high-DPI rendering
+            pixmap.setDevicePixelRatio(device_pixel_ratio)
 
-        # Set pixmap on label (full size)
+        # Set pixmap on label and enable scaled contents for smooth resizing
         image_label.setPixmap(pixmap)
-        image_label.setScaledContents(False)
-        image_label.resize(pixmap.size())
-
-        # Create scroll area to contain the image
-        scroll_area = QScrollArea()
-        scroll_area.setWidget(image_label)
-        scroll_area.setWidgetResizable(False)  # Don't resize the widget inside
-        scroll_area.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        image_label.setScaledContents(True)  # Allow Qt to scale smoothly
+        
+        # Enable high-quality scaling
+        image_label.setStyleSheet("QLabel { background: transparent; }")
 
         # Update format label
         if self.format_label:
             self.format_label.setText(f"Format: {format.upper()}")
             self.format_label.show()
 
-        # Replace loading label with scroll area containing image
+        # Replace loading label with image label directly
         central_widget = self.centralWidget()
         if central_widget:
             layout = central_widget.layout()
@@ -98,14 +128,21 @@ class DiagramWindow(QMainWindow):
                 layout.removeWidget(self.loading_label)
                 self.loading_label.hide()
             # Remove existing image if present
-            if hasattr(self, 'scroll_area') and self.scroll_area and layout:
-                layout.removeWidget(self.scroll_area)
+            if hasattr(self, 'image_label') and hasattr(self, '_previous_image_label') and self._previous_image_label and layout:
+                try:
+                    layout.removeWidget(self._previous_image_label)
+                except (RuntimeError, AttributeError):
+                    pass  # Widget may have already been removed or deleted
             if layout:
-                layout.addWidget(scroll_area)
+                layout.addWidget(image_label)
 
         # Store references for potential future use
+        self._previous_image_label = getattr(self, 'image_label', None)
         self.image_label = image_label
-        self.scroll_area = scroll_area
+        
+        # Store image data for format toggling
+        self.image_data = image_data
+        self.current_format = format
 
     def _setup_toolbar(self):
         """Setup the toolbar with action buttons."""

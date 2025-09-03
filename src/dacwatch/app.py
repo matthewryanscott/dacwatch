@@ -3,7 +3,7 @@ from typing import Optional
 from queue import Queue
 import threading
 from PySide6.QtWidgets import QApplication
-from PySide6.QtCore import QTimer
+from PySide6.QtCore import QTimer, Qt
 from .config import Config
 from .file_watcher import FileWatcher
 from .window_manager import WindowManager
@@ -29,8 +29,11 @@ class DaCWatchApp:
         print(f"DaCWatch starting - watching directory: {self.config.directory}")
         print(f"Using Kroki service: {self.config.kroki_base}")
 
-        # Initialize Qt application
+        # Initialize Qt application with high-DPI support
         if QApplication.instance() is None:
+            # Enable high-DPI support before creating QApplication
+            QApplication.setAttribute(Qt.ApplicationAttribute.AA_EnableHighDpiScaling, True)
+            QApplication.setAttribute(Qt.ApplicationAttribute.AA_UseHighDpiPixmaps, True)
             self.qt_app = QApplication([])
 
         # Initialize the window manager
