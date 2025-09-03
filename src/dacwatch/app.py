@@ -43,9 +43,6 @@ class DaCWatchApp:
         self.file_watcher = FileWatcher(self.config, self._handle_file_event)
         await self.file_watcher.start()
 
-        # Scan for existing diagram files and create windows for them
-        await self._scan_existing_files()
-
     async def stop(self):
         """Stop the application."""
         self.is_running = False
@@ -111,27 +108,7 @@ class DaCWatchApp:
         except Exception as e:
             print(f"Error rendering diagram: {e}")
 
-    async def _scan_existing_files(self):
-        """Scan the watched directory for existing diagram files to establish baseline."""
-        from .file_type import is_supported_file
-        from pathlib import Path
 
-        directory = Path(self.config.directory)
-        if not directory.exists():
-            return
-
-        # Scan existing files but don't create windows - just log them
-        existing_files = []
-        for file_path in directory.rglob('*'):
-            if file_path.is_file() and is_supported_file(file_path):
-                existing_files.append(str(file_path))
-
-        if existing_files:
-            print(f"Found {len(existing_files)} existing diagram files (will not open windows):")
-            for file_path in existing_files:
-                print(f"  - {file_path}")
-        else:
-            print("No existing diagram files found")
 
     async def run(self):
         """Run the main application loop."""

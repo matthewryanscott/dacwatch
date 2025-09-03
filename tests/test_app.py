@@ -109,8 +109,8 @@ async def test_qapplication_initialization_existing_instance(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_scan_existing_files_no_windows_created(tmp_path):
-    """Test that scanning existing files doesn't create windows."""
+async def test_start_without_preregistering_files(tmp_path):
+    """Test that app starts without creating windows for existing files."""
     directory = tmp_path / "test_dir"
     directory.mkdir()
 
@@ -121,20 +121,18 @@ async def test_scan_existing_files_no_windows_created(tmp_path):
     config = Config(directory=directory)
     app = DaCWatchApp(config)
 
-    # Mock the window manager to track if windows are created
-    with patch.object(app, 'window_manager') as mock_wm:
+    # Mock the window manager to track if windows are created during start
+    with patch('dacwatch.app.WindowManager') as mock_wm_class:
         mock_wm_instance = MagicMock()
-        app.window_manager = mock_wm_instance
+        mock_wm_class.return_value = mock_wm_instance
 
-        # Scan existing files
-        await app._scan_existing_files()
+        await app.start()
 
-        # Verify no windows were created for existing files
+        # Verify no windows were created for existing files during startup
         mock_wm_instance.get_or_create_window.assert_not_called()
         mock_wm_instance.create_window.assert_not_called()
 
-        # Verify the files were logged
-        # (This is implicit in the method - it just logs the files found)
+        await app.stop()
 
 
 @pytest.mark.asyncio
