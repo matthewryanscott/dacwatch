@@ -109,6 +109,35 @@ async def test_qapplication_initialization_existing_instance(tmp_path):
 
 
 @pytest.mark.asyncio
+async def test_scan_existing_files_no_windows_created(tmp_path):
+    """Test that scanning existing files doesn't create windows."""
+    directory = tmp_path / "test_dir"
+    directory.mkdir()
+
+    # Create some existing diagram files
+    (directory / "test1.dot").write_text("digraph G { A -> B; }")
+    (directory / "test2.puml").write_text("@startuml\nA -> B\n@enduml")
+
+    config = Config(directory=directory)
+    app = DaCWatchApp(config)
+
+    # Mock the window manager to track if windows are created
+    with patch.object(app, 'window_manager') as mock_wm:
+        mock_wm_instance = MagicMock()
+        app.window_manager = mock_wm_instance
+
+        # Scan existing files
+        await app._scan_existing_files()
+
+        # Verify no windows were created for existing files
+        mock_wm_instance.get_or_create_window.assert_not_called()
+        mock_wm_instance.create_window.assert_not_called()
+
+        # Verify the files were logged
+        # (This is implicit in the method - it just logs the files found)
+
+
+@pytest.mark.asyncio
 async def test_qapplication_cleanup_on_stop(tmp_path):
     """Test QApplication cleanup when app stops."""
     directory = tmp_path / "test_dir"

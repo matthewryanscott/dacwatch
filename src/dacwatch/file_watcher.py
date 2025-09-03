@@ -90,10 +90,16 @@ class FileWatcher:
         self.processing_task = None
         self.debounce_task: Optional[asyncio.Task] = None  # Task for debounce timer
 
+        # Track files that existed when watching started
+        self.baseline_files: Set[str] = set()
+
     async def start(self):
         """Start watching the directory."""
         if self.is_watching:
             return
+
+        # Establish baseline of existing files before starting watcher
+        await self._establish_baseline()
 
         self.is_watching = True
         loop = asyncio.get_running_loop()
@@ -104,6 +110,17 @@ class FileWatcher:
 
         # Start the event processing task
         self.processing_task = asyncio.create_task(self._process_events())
+
+    async def _establish_baseline(self):
+        """Establish baseline of existing files to avoid creating windows for them."""
+        from pathlib import Path
+        from .file_type import is_supported_file
+
+        directory = Path(self.config.directory)
+        if directory.exists():
+            for file_path in directory.rglob('*'):
+                if file_path.is_file() and is_supported_file(file_path):
+                    self.baseline_files.add(str(file_path))
 
     async def stop(self):
         """Stop watching the directory."""
@@ -135,10 +152,19 @@ class FileWatcher:
     async def handle_file_event(self, event: Dict[str, Any]):
         """Handle a file system event by queuing it for processing."""
         file_path = Path(event['src_path'])
+        file_path_str = str(file_path)
 
         # Only process supported file types
         if not is_supported_file(file_path):
             return
+
+        # Handle baseline tracking
+        if event['event_type'] == 'created' and file_path_str in self.baseline_files:
+            # Ignore created events for files that existed when watching started
+            return
+        elif event['event_type'] == 'deleted':
+            # Remove from baseline when file is deleted
+            self.baseline_files.discard(file_path_str)
 
         # Add to queue for debounced processing
         await self.event_queue.put(event)

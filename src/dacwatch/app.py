@@ -7,6 +7,7 @@ from PySide6.QtCore import QTimer
 from .config import Config
 from .file_watcher import FileWatcher
 from .window_manager import WindowManager
+from .kroki_client import KrokiClient
 
 
 class DaCWatchApp:
@@ -17,6 +18,7 @@ class DaCWatchApp:
         self.is_running = False
         self.file_watcher: Optional[FileWatcher] = None
         self.window_manager: Optional[WindowManager] = None
+        self.kroki_client: Optional[KrokiClient] = None
         self.qt_app: Optional[QApplication] = None
         self.event_queue = Queue()
         self.file_watcher_thread: Optional[threading.Thread] = None
@@ -34,11 +36,14 @@ class DaCWatchApp:
         # Initialize the window manager
         self.window_manager = WindowManager()
 
+        # Initialize the Kroki client
+        self.kroki_client = KrokiClient(self.config.kroki_base)
+
         # Start the file watcher
         self.file_watcher = FileWatcher(self.config, self._handle_file_event)
         await self.file_watcher.start()
 
-        # Scan for existing diagram files to establish baseline (no windows created)
+        # Scan for existing diagram files and create windows for them
         await self._scan_existing_files()
 
     async def stop(self):
@@ -52,8 +57,8 @@ class DaCWatchApp:
         print("DaCWatch stopped")
 
     async def _handle_file_event(self, event_type: str, file_path: str):
-        """Handle file events by creating/updating windows."""
-        if not self.window_manager:
+        """Handle file events by creating/updating windows and rendering diagrams."""
+        if not self.window_manager or not self.kroki_client:
             return
 
         if event_type in ['created', 'modified']:
@@ -61,15 +66,48 @@ class DaCWatchApp:
             window = self.window_manager.get_or_create_window(file_path)
             if window:
                 window.show()  # Make sure the window is visible
+
+                # Render and display the diagram
+                try:
+                    await self._render_and_display_diagram(file_path, window)
+                except Exception as e:
+                    print(f"Error rendering diagram for {file_path}: {e}")
+
         elif event_type == 'deleted':
             # Clean up window for deleted file
             self.window_manager.cleanup_deleted_file(file_path)
 
+    async def _render_and_display_diagram(self, file_path: str, window):
+        """Render a diagram and display it in the window."""
+        try:
+            # Read the file content
+            with open(file_path, 'r', encoding='utf-8') as f:
+                source_code = f.read()
+
+            # Determine diagram type
+            diagram_type = self.kroki_client.get_diagram_type(file_path)
+            if not diagram_type:
+                print(f"Unsupported file type for {file_path}")
+                return
+
+            # Render the diagram (default to SVG)
+            image_data = await self.kroki_client.render_diagram(source_code, diagram_type, "svg")
+
+            # Store the source and image data on the window for toolbar actions
+            window.image_data = image_data
+            window.source_code = source_code
+            window.current_format = "svg"
+
+            # Display the image
+            window.display_image(image_data, "svg")
+
+        except FileNotFoundError:
+            print(f"File not found: {file_path}")
+        except Exception as e:
+            print(f"Error rendering diagram: {e}")
+
     async def _scan_existing_files(self):
         """Scan the watched directory for existing diagram files to establish baseline."""
-        if not self.window_manager:
-            return
-
         from .file_type import is_supported_file
         from pathlib import Path
 
@@ -77,13 +115,18 @@ class DaCWatchApp:
         if not directory.exists():
             return
 
-        # Just scan and remember existing files - don't create windows for them
-        # This establishes our baseline so we only respond to changes after startup
+        # Scan existing files but don't create windows - just log them
+        existing_files = []
         for file_path in directory.rglob('*'):
             if file_path.is_file() and is_supported_file(file_path):
-                # Store the file path to track it, but don't create a window
-                # The file watcher will handle any changes after this point
-                pass
+                existing_files.append(str(file_path))
+
+        if existing_files:
+            print(f"Found {len(existing_files)} existing diagram files (will not open windows):")
+            for file_path in existing_files:
+                print(f"  - {file_path}")
+        else:
+            print("No existing diagram files found")
 
     async def run(self):
         """Run the main application loop."""

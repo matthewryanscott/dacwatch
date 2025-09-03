@@ -1,8 +1,8 @@
 import asyncio
 import typer
 from pathlib import Path
-from .config import Config
-from .app import DaCWatchApp
+from dacwatch.config import Config
+from dacwatch.app import DaCWatchApp
 
 app = typer.Typer(name="dacwatch", help="DaCWatch - Diagram as Code File Watcher")
 
@@ -35,32 +35,32 @@ def main(
     except ImportError:
         typer.echo("Error: qasync is required but not installed. Please install it with: uv add qasync")
         return
-        
+
     import signal
     import sys
     from PySide6.QtWidgets import QApplication
-    
+
     # Create Qt application in main thread
     if QApplication.instance() is None:
         qt_app = QApplication([])
     else:
         qt_app = QApplication.instance()
-    
+
     if not qt_app:
         typer.echo("Error: Could not create Qt application")
         return
-    
+
     # Configure Qt to NOT quit when the last window is closed
     # We want to keep watching for files even when no windows are open
     if hasattr(qt_app, 'setQuitOnLastWindowClosed'):
         qt_app.setQuitOnLastWindowClosed(False)  # type: ignore
-    
+
     # Set up signal handler for graceful shutdown
     def signal_handler(signum, frame):
         print("\nReceived interrupt signal, shutting down...")
         qt_app.quit()
         sys.exit(0)
-    
+
     signal.signal(signal.SIGINT, signal_handler)
 
     # Create the asyncio event loop using qasync
@@ -73,20 +73,21 @@ def main(
     try:
         print("DaCWatch starting...")
         print("DaCWatch is now running. Close the windows or press Ctrl+C to stop.")
-        
-        # Start the application without blocking
-        asyncio.ensure_future(dac_app.start())
-        
+
+        # Start the application using the qasync loop
+        loop.create_task(dac_app.start())
+
         # Run the Qt application event loop through qasync
         # This will block until Qt app is closed
         loop.run_forever()
-        
+
     except KeyboardInterrupt:
         typer.echo("Received interrupt signal, shutting down...")
         qt_app.quit()
     finally:
         # Clean up
-        asyncio.ensure_future(dac_app.stop())
+        if not loop.is_closed():
+            loop.create_task(dac_app.stop())
         loop.close()
 
 
