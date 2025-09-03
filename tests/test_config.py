@@ -5,7 +5,7 @@ import sys
 # Add the project root to Python path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from config import Config
+from dacwatch.config import Config
 
 
 def test_config_creation(tmp_path):

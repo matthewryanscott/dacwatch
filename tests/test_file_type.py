@@ -5,7 +5,7 @@ import sys
 # Add the project root to Python path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from file_type import get_diagram_type, is_supported_file
+from dacwatch.file_type import get_diagram_type, is_supported_file
 
 
 def test_get_diagram_type_dot():

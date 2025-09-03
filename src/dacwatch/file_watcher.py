@@ -4,8 +4,8 @@ from typing import Optional, Dict, Any, Set
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
-from config import Config
-from file_type import is_supported_file
+from .config import Config
+from .file_type import is_supported_file
 
 
 class AsyncEventHandler(FileSystemEventHandler):

@@ -1,7 +1,7 @@
 import asyncio
 from typing import Optional
-from config import Config
-from file_watcher import FileWatcher
+from .config import Config
+from .file_watcher import FileWatcher
 
 
 class DaCWatchApp:

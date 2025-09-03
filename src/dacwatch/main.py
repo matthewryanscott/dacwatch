@@ -1,8 +1,8 @@
 import asyncio
 import typer
 from pathlib import Path
-from config import Config
-from app import DaCWatchApp
+from .config import Config
+from .app import DaCWatchApp
 
 app = typer.Typer(name="dacwatch", help="DaCWatch - Diagram as Code File Watcher")
 
