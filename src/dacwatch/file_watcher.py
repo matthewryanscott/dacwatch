@@ -15,39 +15,70 @@ class AsyncEventHandler(FileSystemEventHandler):
         self.file_watcher = file_watcher
         self.loop = loop
 
+    def _schedule_async_task(self, event_data):
+        """Safely schedule an async task."""
+        try:
+            if self.loop and not self.loop.is_closed():
+                # Try to schedule the task on the original loop
+                self.loop.call_soon_threadsafe(
+                    lambda: asyncio.create_task(self.file_watcher.handle_file_event(event_data))
+                )
+            else:
+                # Fallback: try to get the running loop and schedule there
+                try:
+                    current_loop = asyncio.get_running_loop()
+                    current_loop.call_soon_threadsafe(
+                        lambda: asyncio.create_task(self.file_watcher.handle_file_event(event_data))
+                    )
+                except RuntimeError:
+                    # No running loop, create a new one in a thread
+                    import threading
+                    
+                    def run_in_thread():
+                        try:
+                            asyncio.run(self.file_watcher.handle_file_event(event_data))
+                        except Exception as e:
+                            print(f"Error processing file event: {e}")
+                    
+                    thread = threading.Thread(target=run_in_thread, daemon=True)
+                    thread.start()
+        except Exception as e:
+            print(f"Error scheduling async task: {e}")
+
     def on_created(self, event):
         """Handle file creation events."""
         if not event.is_directory:
-            self.loop.create_task(self.file_watcher.handle_file_event({
+            self._schedule_async_task({
                 'event_type': 'created',
                 'src_path': event.src_path,
                 'is_directory': event.is_directory
-            }))
+            })
 
     def on_modified(self, event):
         """Handle file modification events."""
         if not event.is_directory:
-            self.loop.create_task(self.file_watcher.handle_file_event({
+            self._schedule_async_task({
                 'event_type': 'modified',
                 'src_path': event.src_path,
                 'is_directory': event.is_directory
-            }))
+            })
 
     def on_deleted(self, event):
         """Handle file deletion events."""
         if not event.is_directory:
-            self.loop.create_task(self.file_watcher.handle_file_event({
+            self._schedule_async_task({
                 'event_type': 'deleted',
                 'src_path': event.src_path,
                 'is_directory': event.is_directory
-            }))
+            })
 
 
 class FileWatcher:
     """Async file watcher using watchdog with event debouncing."""
 
-    def __init__(self, config: Config):
+    def __init__(self, config: Config, event_callback=None):
         self.config = config
+        self.event_callback = event_callback
         self.is_watching = False
         self.observer = None
         self.event_handler = None
@@ -181,7 +212,8 @@ class FileWatcher:
         """Process a single file event."""
         file_path_obj = Path(file_path)
 
-        # For now, just print the event
         print(f"Processed file event: {event_type} - {file_path_obj}")
 
-        # TODO: Process the event (e.g., trigger diagram rendering)
+        # Call the event callback if provided
+        if self.event_callback:
+            await self.event_callback(event_type, file_path)

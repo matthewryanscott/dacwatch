@@ -25,11 +25,11 @@
 - [x] **Manual Validation**: Create/modify/delete test files to verify watching works
 
 ## Phase 3: Window Management (TDD)
-- [ ] **Window Registry**: Test file-to-window mapping, then implement
-- [ ] **Window Factory**: Test window creation logic (mock QMainWindow), then implement
-- [ ] **Window Cleanup**: Test window cleanup on file deletion, then implement
-- [ ] **Window State**: Test state persistence, then implement
-- [ ] **Manual Validation**: Open/close windows manually to verify behavior
+- [x] **Window Registry**: Test file-to-window mapping, then implement
+- [x] **Window Factory**: Test window creation logic (mock QMainWindow), then implement
+- [x] **Window Cleanup**: Test window cleanup on file deletion, then implement
+- [x] **Window State**: Test state persistence, then implement
+- [x] **Manual Validation**: Open/close windows manually to verify behavior
 
 ## Phase 4: Kroki Integration (TDD)
 - [ ] **HTTP Client**: Test HTTP requests with mock aiohttp responses, then implement

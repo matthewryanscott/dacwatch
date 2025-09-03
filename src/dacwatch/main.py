@@ -26,15 +26,68 @@ def main(
         typer.echo("Dry run completed successfully")
         return
 
-    # Create and run the application
+    # Create the application
     dac_app = DaCWatchApp(config)
 
-    # Run the async application
+    # Use qasync for proper asyncio-Qt integration
     try:
-        asyncio.run(dac_app.run())
+        import qasync
+    except ImportError:
+        typer.echo("Error: qasync is required but not installed. Please install it with: uv add qasync")
+        return
+        
+    import signal
+    import sys
+    from PySide6.QtWidgets import QApplication
+    
+    # Create Qt application in main thread
+    if QApplication.instance() is None:
+        qt_app = QApplication([])
+    else:
+        qt_app = QApplication.instance()
+    
+    if not qt_app:
+        typer.echo("Error: Could not create Qt application")
+        return
+    
+    # Configure Qt to NOT quit when the last window is closed
+    # We want to keep watching for files even when no windows are open
+    if hasattr(qt_app, 'setQuitOnLastWindowClosed'):
+        qt_app.setQuitOnLastWindowClosed(False)  # type: ignore
+    
+    # Set up signal handler for graceful shutdown
+    def signal_handler(signum, frame):
+        print("\nReceived interrupt signal, shutting down...")
+        qt_app.quit()
+        sys.exit(0)
+    
+    signal.signal(signal.SIGINT, signal_handler)
+
+    # Create the asyncio event loop using qasync
+    loop = qasync.QEventLoop(qt_app)
+    asyncio.set_event_loop(loop)
+
+    # Store Qt app reference in the DaCWatchApp for later use
+    dac_app.qt_app = qt_app  # type: ignore
+
+    try:
+        print("DaCWatch starting...")
+        print("DaCWatch is now running. Close the windows or press Ctrl+C to stop.")
+        
+        # Start the application without blocking
+        asyncio.ensure_future(dac_app.start())
+        
+        # Run the Qt application event loop through qasync
+        # This will block until Qt app is closed
+        loop.run_forever()
+        
     except KeyboardInterrupt:
         typer.echo("Received interrupt signal, shutting down...")
-        # The app will handle cleanup in its stop method
+        qt_app.quit()
+    finally:
+        # Clean up
+        asyncio.ensure_future(dac_app.stop())
+        loop.close()
 
 
 if __name__ == "__main__":
