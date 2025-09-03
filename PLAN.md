@@ -4,11 +4,11 @@
 **IMPORTANT**: When completing any task below, update the corresponding checkboxes in this PLAN.md and update README.md if new features/usage patterns are added.
 
 ## Phase 1: Core Infrastructure (TDD)
-- [ ] **CLI Argument Parser**: Write tests for Typer CLI argument parsing, then implement
-- [ ] **Configuration**: Test config object creation/validation, then implement
-- [ ] **File Type Detection**: Test file extension mapping, then implement logic
-- [ ] **Basic Application Structure**: Test async event loop setup, then implement
-- [ ] **Manual Validation**: Run `uv run main.py --help` to verify CLI works
+- [x] **CLI Argument Parser**: Write tests for Typer CLI argument parsing, then implement
+- [x] **Configuration**: Test config object creation/validation, then implement
+- [x] **File Type Detection**: Test file extension mapping, then implement logic
+- [x] **Basic Application Structure**: Test async event loop setup, then implement
+- [x] **Manual Validation**: Run `uv run main.py --help` to verify CLI works
 
 ## Phase 2: File Watching System (TDD)
 - [ ] **Async File Watcher**: Test directory monitoring with mock filesystem, then implement
