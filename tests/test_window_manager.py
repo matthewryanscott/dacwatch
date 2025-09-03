@@ -375,6 +375,647 @@ class TestWindowCleanup:
         assert manager.window_count == 1
 
 
+class TestDiagramWindowImageDisplay:
+    """Test suite for DiagramWindow image display functionality."""
+
+    def test_display_image_svg_format(self):
+        """Test displaying SVG image data."""
+        from unittest.mock import patch, Mock
+
+        # Mock PySide components
+        with patch('PySide6.QtWidgets.QLabel') as mock_qlabel, \
+             patch('PySide6.QtGui.QPixmap') as mock_qpixmap, \
+             patch('PySide6.QtCore.QByteArray') as mock_qbytearray:
+
+            # Setup mocks
+            mock_label = Mock()
+            mock_qlabel.return_value = mock_label
+
+            mock_pixmap = Mock()
+            mock_pixmap.width.return_value = 400
+            mock_pixmap.height.return_value = 300
+            mock_qpixmap.return_value = mock_pixmap
+
+            mock_byte_array = Mock()
+            mock_qbytearray.return_value = mock_byte_array
+
+            # Create a mock window object to test the method
+            mock_window = Mock()
+            mock_window.loading_label = Mock()
+            mock_window.width.return_value = 800
+            mock_window.height.return_value = 600
+            mock_central_widget = Mock()
+            mock_layout = Mock()
+            mock_central_widget.layout.return_value = mock_layout
+            mock_window.centralWidget = Mock(return_value=mock_central_widget)
+
+            # Import and bind the method to our mock
+            from dacwatch.window_manager import DiagramWindow
+            mock_window.display_image = DiagramWindow.display_image.__get__(mock_window, DiagramWindow)
+
+            # Mock image data (SVG content)
+            svg_data = b'<svg><circle cx="50" cy="50" r="40"/></svg>'
+
+            # Call display_image
+            mock_window.display_image(svg_data, "svg")
+
+            # Verify QLabel was created and added to layout
+            mock_qlabel.assert_called_once()
+            # Verify QPixmap was created from SVG data
+            mock_qpixmap.assert_called_once()
+            # Verify label was configured
+            mock_label.setPixmap.assert_called_once_with(mock_pixmap)
+            mock_label.setScaledContents.assert_called_once_with(False)  # Image fits, no scaling needed
+            # Verify layout operations
+            mock_layout.removeWidget.assert_called_once_with(mock_window.loading_label)
+            mock_layout.addWidget.assert_called_once_with(mock_label)
+
+    def test_display_image_png_format(self):
+        """Test displaying PNG image data."""
+        from unittest.mock import patch, Mock
+
+        with patch('PySide6.QtWidgets.QLabel') as mock_qlabel, \
+             patch('PySide6.QtGui.QPixmap') as mock_qpixmap:
+
+            mock_label = Mock()
+            mock_qlabel.return_value = mock_label
+
+            mock_pixmap = Mock()
+            mock_pixmap.width.return_value = 400
+            mock_pixmap.height.return_value = 300
+            mock_qpixmap.return_value = mock_pixmap
+
+            # Create a mock window object to test the method
+            mock_window = Mock()
+            mock_window.loading_label = Mock()
+            mock_window.width.return_value = 800
+            mock_window.height.return_value = 600
+            mock_central_widget = Mock()
+            mock_layout = Mock()
+            mock_central_widget.layout.return_value = mock_layout
+            mock_window.centralWidget = Mock(return_value=mock_central_widget)
+
+            # Import and bind the method to our mock
+            from dacwatch.window_manager import DiagramWindow
+            mock_window.display_image = DiagramWindow.display_image.__get__(mock_window, DiagramWindow)
+
+            # Mock PNG image data
+            png_data = b'\x89PNG\r\n\x1a\n' + b'x' * 100  # Minimal PNG header + data
+
+            # Call display_image
+            mock_window.display_image(png_data, "png")
+
+            # Verify QPixmap was created from PNG data
+            mock_qpixmap.assert_called_once()
+            mock_label.setPixmap.assert_called_once_with(mock_pixmap)
+            mock_label.setScaledContents.assert_called_once_with(False)  # Image fits, no scaling needed
+
+    def test_display_image_replaces_loading_label(self):
+        """Test that display_image replaces the loading label with image."""
+        from unittest.mock import patch, Mock
+
+        with patch('PySide6.QtWidgets.QLabel') as mock_qlabel, \
+             patch('PySide6.QtGui.QPixmap') as mock_qpixmap:
+
+            mock_image_label = Mock()
+            mock_qlabel.return_value = mock_image_label
+
+            mock_pixmap = Mock()
+            mock_pixmap.width.return_value = 400
+            mock_pixmap.height.return_value = 300
+            mock_qpixmap.return_value = mock_pixmap
+
+            # Create a mock window object to test the method
+            mock_window = Mock()
+            mock_window.loading_label = Mock()
+            mock_window.width.return_value = 800
+            mock_window.height.return_value = 600
+            mock_central_widget = Mock()
+            mock_layout = Mock()
+            mock_central_widget.layout.return_value = mock_layout
+            mock_window.centralWidget = Mock(return_value=mock_central_widget)
+
+            # Import and bind the method to our mock
+            from dacwatch.window_manager import DiagramWindow
+            mock_window.display_image = DiagramWindow.display_image.__get__(mock_window, DiagramWindow)
+
+            # Mock image data
+            image_data = b'<svg>test</svg>'
+
+            # Call display_image
+            mock_window.display_image(image_data, "svg")
+
+            # Verify loading label was removed and image label was added
+            mock_layout.removeWidget.assert_called_once_with(mock_window.loading_label)
+            mock_layout.addWidget.assert_called_once_with(mock_image_label)
+
+    def test_display_image_handles_empty_data(self):
+        """Test display_image handles empty image data gracefully."""
+        from unittest.mock import patch, Mock
+
+        with patch('PySide6.QtWidgets.QLabel') as mock_qlabel, \
+             patch('PySide6.QtGui.QPixmap') as mock_qpixmap:
+
+            mock_label = Mock()
+            mock_qlabel.return_value = mock_label
+
+            mock_pixmap = Mock()
+            mock_pixmap.width.return_value = 400
+            mock_pixmap.height.return_value = 300
+            mock_qpixmap.return_value = mock_pixmap
+
+            # Create a mock window object to test the method
+            mock_window = Mock()
+            mock_window.loading_label = Mock()
+            mock_window.width.return_value = 800
+            mock_window.height.return_value = 600
+            mock_central_widget = Mock()
+            mock_layout = Mock()
+            mock_central_widget.layout.return_value = mock_layout
+            mock_window.centralWidget = Mock(return_value=mock_central_widget)
+
+            # Import and bind the method to our mock
+            from dacwatch.window_manager import DiagramWindow
+            mock_window.display_image = DiagramWindow.display_image.__get__(mock_window, DiagramWindow)
+
+            # Call display_image with empty data
+            mock_window.display_image(b'', "svg")
+
+            # Should still attempt to create pixmap and set it
+            mock_qpixmap.assert_called_once()
+            mock_label.setPixmap.assert_called_once_with(mock_pixmap)
+
+    def test_display_image_invalid_format(self):
+        """Test display_image with invalid format parameter."""
+        from unittest.mock import patch, Mock
+
+        # Create a mock window object to test the method
+        mock_window = Mock()
+
+        # Import and bind the method to our mock
+        from dacwatch.window_manager import DiagramWindow
+        mock_window.display_image = DiagramWindow.display_image.__get__(mock_window, DiagramWindow)
+
+        # Should raise ValueError for invalid format
+        with pytest.raises(ValueError, match="Format must be 'svg' or 'png'"):
+            mock_window.display_image(b'test', "invalid")
+
+
+class TestDiagramWindowToolbar:
+    """Test suite for DiagramWindow toolbar functionality."""
+
+    def test_toggle_format_button_creation(self):
+        """Test that toggle format button is created and configured."""
+        from unittest.mock import patch, Mock
+
+        with patch('PySide6.QtWidgets.QPushButton') as mock_button, \
+             patch('PySide6.QtWidgets.QToolBar') as mock_toolbar:
+
+            mock_toggle_button = Mock()
+            mock_button.return_value = mock_toggle_button
+
+            mock_toolbar_instance = Mock()
+            mock_toolbar.return_value = mock_toolbar_instance
+
+            # Create a mock window object to test the method
+            mock_window = Mock()
+            mock_window.file_path = "/path/to/test/file.dot"
+            mock_window.addToolBar = Mock()
+
+            # Import and bind the method to our mock
+            from dacwatch.window_manager import DiagramWindow
+            mock_window._setup_toolbar = DiagramWindow._setup_toolbar.__get__(mock_window, DiagramWindow)
+
+            # Call _setup_toolbar
+            mock_window._setup_toolbar()
+
+            # Verify toggle format button was created (should be first call)
+            assert mock_button.call_args_list[0][0][0] == "Toggle SVG/PNG"
+            # Verify button was added to toolbar
+            assert mock_toolbar_instance.addWidget.call_count >= 1
+
+    def test_copy_image_button_creation(self):
+        """Test that copy image button is created and configured."""
+        from unittest.mock import patch, Mock
+
+        with patch('PySide6.QtWidgets.QPushButton') as mock_button, \
+             patch('PySide6.QtWidgets.QHBoxLayout') as mock_layout, \
+             patch('PySide6.QtWidgets.QToolBar') as mock_toolbar:
+
+            mock_copy_button = Mock()
+            mock_button.return_value = mock_copy_button
+
+            mock_toolbar_instance = Mock()
+            mock_toolbar.return_value = mock_toolbar_instance
+
+            # Create a mock window object to test the method
+            mock_window = Mock()
+            mock_window.file_path = "/path/to/test/file.dot"
+
+            # Import and bind the method to our mock
+            from dacwatch.window_manager import DiagramWindow
+            mock_window._setup_toolbar = DiagramWindow._setup_toolbar.__get__(mock_window, DiagramWindow)
+
+            # Call _setup_toolbar
+            mock_window._setup_toolbar()
+
+            # Verify copy image button was created
+            assert mock_button.call_count >= 2  # At least toggle and copy buttons
+            # Verify buttons were added to toolbar
+            assert mock_toolbar_instance.addWidget.call_count >= 2
+
+    def test_copy_source_button_creation(self):
+        """Test that copy source button is created and configured."""
+        from unittest.mock import patch, Mock
+
+        with patch('PySide6.QtWidgets.QPushButton') as mock_button, \
+             patch('PySide6.QtWidgets.QHBoxLayout') as mock_layout, \
+             patch('PySide6.QtWidgets.QToolBar') as mock_toolbar:
+
+            mock_copy_source_button = Mock()
+            mock_button.return_value = mock_copy_source_button
+
+            mock_toolbar_instance = Mock()
+            mock_toolbar.return_value = mock_toolbar_instance
+
+            # Create a mock window object to test the method
+            mock_window = Mock()
+            mock_window.file_path = "/path/to/test/file.dot"
+
+            # Import and bind the method to our mock
+            from dacwatch.window_manager import DiagramWindow
+            mock_window._setup_toolbar = DiagramWindow._setup_toolbar.__get__(mock_window, DiagramWindow)
+
+            # Call _setup_toolbar
+            mock_window._setup_toolbar()
+
+            # Verify copy source button was created
+            assert mock_button.call_count >= 3  # toggle, copy image, copy source buttons
+            # Verify buttons were added to toolbar
+            assert mock_toolbar_instance.addWidget.call_count >= 3
+
+    def test_reveal_finder_button_creation(self):
+        """Test that reveal in finder button is created and configured."""
+        from unittest.mock import patch, Mock
+
+        with patch('PySide6.QtWidgets.QPushButton') as mock_button, \
+             patch('PySide6.QtWidgets.QHBoxLayout') as mock_layout, \
+             patch('PySide6.QtWidgets.QToolBar') as mock_toolbar:
+
+            mock_reveal_button = Mock()
+            mock_button.return_value = mock_reveal_button
+
+            mock_toolbar_instance = Mock()
+            mock_toolbar.return_value = mock_toolbar_instance
+
+            # Create a mock window object to test the method
+            mock_window = Mock()
+            mock_window.file_path = "/path/to/test/file.dot"
+
+            # Import and bind the method to our mock
+            from dacwatch.window_manager import DiagramWindow
+            mock_window._setup_toolbar = DiagramWindow._setup_toolbar.__get__(mock_window, DiagramWindow)
+
+            # Call _setup_toolbar
+            mock_window._setup_toolbar()
+
+            # Verify reveal button was created
+            assert mock_button.call_count >= 4  # toggle, copy image, copy source, reveal buttons
+            # Verify buttons were added to toolbar
+            assert mock_toolbar_instance.addWidget.call_count >= 4
+
+    def test_toggle_format_functionality(self):
+        """Test toggle format functionality."""
+        from unittest.mock import patch, Mock
+
+        # Create a mock window object
+        mock_window = Mock()
+        mock_window.current_format = "svg"
+        mock_window.image_data = b'<svg>test</svg>'
+        mock_window.display_image = Mock()
+
+        # Import and bind the method to our mock
+        from dacwatch.window_manager import DiagramWindow
+        mock_window.toggle_format = DiagramWindow.toggle_format.__get__(mock_window, DiagramWindow)
+
+        # Call toggle_format
+        mock_window.toggle_format()
+
+        # Verify display_image was called with PNG format
+        mock_window.display_image.assert_called_once_with(b'<svg>test</svg>', "png")
+        # Verify format was toggled
+        assert mock_window.current_format == "png"
+
+    def test_copy_image_to_clipboard(self):
+        """Test copying image to clipboard."""
+        from unittest.mock import patch, Mock
+
+        with patch('PySide6.QtWidgets.QApplication') as mock_qapp, \
+             patch('PySide6.QtGui.QPixmap') as mock_pixmap, \
+             patch('PySide6.QtCore.QByteArray') as mock_qbytearray:
+
+            mock_clipboard_instance = Mock()
+            mock_qapp.clipboard.return_value = mock_clipboard_instance
+
+            mock_pixmap_instance = Mock()
+            mock_image = Mock()
+            mock_pixmap_instance.toImage.return_value = mock_image
+            mock_pixmap.return_value = mock_pixmap_instance
+
+            mock_byte_array = Mock()
+            mock_qbytearray.return_value = mock_byte_array
+
+            # Create a mock window object
+            mock_window = Mock()
+            mock_window.image_data = b'<svg>test</svg>'
+            mock_window.current_format = "svg"
+
+            # Import and bind the method to our mock
+            from dacwatch.window_manager import DiagramWindow
+            mock_window.copy_image_to_clipboard = DiagramWindow.copy_image_to_clipboard.__get__(mock_window, DiagramWindow)
+
+            # Call copy_image_to_clipboard
+            mock_window.copy_image_to_clipboard()
+
+            # Verify clipboard was accessed and data was set
+            mock_qapp.clipboard.assert_called_once()
+            mock_clipboard_instance.setImage.assert_called_once_with(mock_image)
+
+    def test_copy_source_to_clipboard(self):
+        """Test copying source code to clipboard."""
+        from unittest.mock import patch, Mock
+
+        with patch('PySide6.QtWidgets.QApplication') as mock_qapp, \
+             patch('builtins.open', create=True) as mock_open:
+
+            mock_clipboard_instance = Mock()
+            mock_qapp.clipboard.return_value = mock_clipboard_instance
+
+            mock_file = Mock()
+            mock_file.read.return_value = "source code content"
+            mock_open.return_value.__enter__.return_value = mock_file
+
+            # Create a mock window object
+            mock_window = Mock()
+            mock_window.file_path = "/path/to/test/file.dot"
+
+            # Import and bind the method to our mock
+            from dacwatch.window_manager import DiagramWindow
+            mock_window.copy_source_to_clipboard = DiagramWindow.copy_source_to_clipboard.__get__(mock_window, DiagramWindow)
+
+            # Call copy_source_to_clipboard
+            mock_window.copy_source_to_clipboard()
+
+            # Verify file was opened and read
+            mock_open.assert_called_once_with("/path/to/test/file.dot", 'r')
+            mock_file.read.assert_called_once()
+            # Verify clipboard was set with source content
+            mock_qapp.clipboard.assert_called_once()
+            mock_clipboard_instance.setText.assert_called_once_with("source code content")
+
+    def test_reveal_in_finder(self):
+        """Test reveal in finder functionality."""
+        from unittest.mock import patch, Mock
+
+        with patch('subprocess.run') as mock_subprocess:
+            # Create a mock window object
+            mock_window = Mock()
+            mock_window.file_path = "/path/to/test/file.dot"
+
+            # Import and bind the method to our mock
+            from dacwatch.window_manager import DiagramWindow
+            mock_window.reveal_in_finder = DiagramWindow.reveal_in_finder.__get__(mock_window, DiagramWindow)
+
+            # Call reveal_in_finder
+            mock_window.reveal_in_finder()
+
+            # Verify subprocess.run was called with correct arguments
+            mock_subprocess.assert_called_once_with(['open', '-R', "/path/to/test/file.dot"])
+
+
+class TestDiagramWindowAutoScaling:
+    """Test suite for DiagramWindow auto-scaling functionality."""
+
+    def test_auto_scale_image_smaller_than_window(self):
+        """Test auto-scaling when image is smaller than window."""
+        from unittest.mock import patch, Mock
+
+        with patch('PySide6.QtWidgets.QLabel') as mock_qlabel, \
+             patch('PySide6.QtGui.QPixmap') as mock_qpixmap:
+
+            mock_label = Mock()
+            mock_qlabel.return_value = mock_label
+
+            mock_pixmap = Mock()
+            mock_pixmap.width.return_value = 400
+            mock_pixmap.height.return_value = 300
+            mock_qpixmap.return_value = mock_pixmap
+
+            # Create a mock window object
+            mock_window = Mock()
+            mock_window.width.return_value = 800
+            mock_window.height.return_value = 600
+            mock_window.loading_label = Mock()
+            mock_central_widget = Mock()
+            mock_layout = Mock()
+            mock_central_widget.layout.return_value = mock_layout
+            mock_window.centralWidget = Mock(return_value=mock_central_widget)
+
+            # Import and bind the method to our mock
+            from dacwatch.window_manager import DiagramWindow
+            mock_window.display_image = DiagramWindow.display_image.__get__(mock_window, DiagramWindow)
+
+            # Mock image data
+            image_data = b'<svg>test</svg>'
+
+            # Call display_image
+            mock_window.display_image(image_data, "svg")
+
+            # Verify pixmap was scaled (image is smaller, so should not be scaled up)
+            mock_pixmap.scaled.assert_not_called()
+            # Verify label was set to not scale contents (since image fits)
+            mock_label.setScaledContents.assert_called_once_with(False)
+
+    def test_auto_scale_image_larger_than_window(self):
+        """Test auto-scaling when image is larger than window."""
+        from unittest.mock import patch, Mock
+
+        with patch('PySide6.QtWidgets.QLabel') as mock_qlabel, \
+             patch('PySide6.QtGui.QPixmap') as mock_qpixmap, \
+             patch('PySide6.QtCore.Qt.AspectRatioMode') as mock_aspect_mode:
+
+            mock_label = Mock()
+            mock_qlabel.return_value = mock_label
+
+            mock_pixmap = Mock()
+            mock_pixmap.width.return_value = 1200
+            mock_pixmap.height.return_value = 800
+            mock_scaled_pixmap = Mock()
+            mock_pixmap.scaled.return_value = mock_scaled_pixmap
+            mock_qpixmap.return_value = mock_pixmap
+
+            mock_aspect_mode.KeepAspectRatio = Mock()
+
+            # Create a mock window object
+            mock_window = Mock()
+            mock_window.width.return_value = 800
+            mock_window.height.return_value = 600
+            mock_window.loading_label = Mock()
+            mock_central_widget = Mock()
+            mock_layout = Mock()
+            mock_central_widget.layout.return_value = mock_layout
+            mock_window.centralWidget = Mock(return_value=mock_central_widget)
+
+            # Import and bind the method to our mock
+            from dacwatch.window_manager import DiagramWindow
+            mock_window.display_image = DiagramWindow.display_image.__get__(mock_window, DiagramWindow)
+
+            # Mock image data
+            image_data = b'<svg>test</svg>'
+
+            # Call display_image
+            mock_window.display_image(image_data, "svg")
+
+            # Verify pixmap was scaled down
+            mock_pixmap.scaled.assert_called_once()
+            # Verify scaled pixmap was used
+            mock_label.setPixmap.assert_called_once_with(mock_scaled_pixmap)
+            # Verify label was set to scale contents
+            mock_label.setScaledContents.assert_called_once_with(True)
+
+    def test_auto_scale_calculation_width_limited(self):
+        """Test auto-scaling calculation when width is the limiting factor."""
+        from unittest.mock import patch, Mock
+
+        with patch('PySide6.QtWidgets.QLabel') as mock_qlabel, \
+             patch('PySide6.QtGui.QPixmap') as mock_qpixmap, \
+             patch('PySide6.QtCore.Qt.AspectRatioMode') as mock_aspect_mode:
+
+            mock_label = Mock()
+            mock_qlabel.return_value = mock_label
+
+            mock_pixmap = Mock()
+            mock_pixmap.width.return_value = 1600
+            mock_pixmap.height.return_value = 400
+            mock_scaled_pixmap = Mock()
+            mock_pixmap.scaled.return_value = mock_scaled_pixmap
+            mock_qpixmap.return_value = mock_pixmap
+
+            mock_aspect_mode.KeepAspectRatio = Mock()
+
+            # Create a mock window object
+            mock_window = Mock()
+            mock_window.width.return_value = 800
+            mock_window.height.return_value = 600
+            mock_window.loading_label = Mock()
+            mock_central_widget = Mock()
+            mock_layout = Mock()
+            mock_central_widget.layout.return_value = mock_layout
+            mock_window.centralWidget = Mock(return_value=mock_central_widget)
+
+            # Import and bind the method to our mock
+            from dacwatch.window_manager import DiagramWindow
+            mock_window.display_image = DiagramWindow.display_image.__get__(mock_window, DiagramWindow)
+
+            # Mock image data
+            image_data = b'<svg>test</svg>'
+
+            # Call display_image
+            mock_window.display_image(image_data, "svg")
+
+            # Verify scaled was called with correct width (800) and proportional height
+            # Original: 1600x400, Window: 800x600
+            # Scale factor: 800/1600 = 0.5, so height should be 400 * 0.5 = 200
+            mock_pixmap.scaled.assert_called_once_with(800, 200, mock_aspect_mode.KeepAspectRatio)
+
+    def test_auto_scale_calculation_height_limited(self):
+        """Test auto-scaling calculation when height is the limiting factor."""
+        from unittest.mock import patch, Mock
+
+        with patch('PySide6.QtWidgets.QLabel') as mock_qlabel, \
+             patch('PySide6.QtGui.QPixmap') as mock_qpixmap, \
+             patch('PySide6.QtCore.Qt.AspectRatioMode') as mock_aspect_mode:
+
+            mock_label = Mock()
+            mock_qlabel.return_value = mock_label
+
+            mock_pixmap = Mock()
+            mock_pixmap.width.return_value = 400
+            mock_pixmap.height.return_value = 1200
+            mock_scaled_pixmap = Mock()
+            mock_pixmap.scaled.return_value = mock_scaled_pixmap
+            mock_qpixmap.return_value = mock_pixmap
+
+            mock_aspect_mode.KeepAspectRatio = Mock()
+
+            # Create a mock window object
+            mock_window = Mock()
+            mock_window.width.return_value = 800
+            mock_window.height.return_value = 600
+            mock_window.loading_label = Mock()
+            mock_central_widget = Mock()
+            mock_layout = Mock()
+            mock_central_widget.layout.return_value = mock_layout
+            mock_window.centralWidget = Mock(return_value=mock_central_widget)
+
+            # Import and bind the method to our mock
+            from dacwatch.window_manager import DiagramWindow
+            mock_window.display_image = DiagramWindow.display_image.__get__(mock_window, DiagramWindow)
+
+            # Mock image data
+            image_data = b'<svg>test</svg>'
+
+            # Call display_image
+            mock_window.display_image(image_data, "svg")
+
+            # Verify scaled was called with correct height (600) and proportional width
+            # Original: 400x1200, Window: 800x600
+            # Scale factor: 600/1200 = 0.5, so width should be 400 * 0.5 = 200
+            mock_pixmap.scaled.assert_called_once_with(200, 600, mock_aspect_mode.KeepAspectRatio)
+
+    def test_auto_scale_no_scaling_needed(self):
+        """Test that no scaling occurs when image fits perfectly."""
+        from unittest.mock import patch, Mock
+
+        with patch('PySide6.QtWidgets.QLabel') as mock_qlabel, \
+             patch('PySide6.QtGui.QPixmap') as mock_qpixmap:
+
+            mock_label = Mock()
+            mock_qlabel.return_value = mock_label
+
+            mock_pixmap = Mock()
+            mock_pixmap.width.return_value = 800
+            mock_pixmap.height.return_value = 600
+            mock_qpixmap.return_value = mock_pixmap
+
+            # Create a mock window object
+            mock_window = Mock()
+            mock_window.width.return_value = 800
+            mock_window.height.return_value = 600
+            mock_window.loading_label = Mock()
+            mock_central_widget = Mock()
+            mock_layout = Mock()
+            mock_central_widget.layout.return_value = mock_layout
+            mock_window.centralWidget = Mock(return_value=mock_central_widget)
+
+            # Import and bind the method to our mock
+            from dacwatch.window_manager import DiagramWindow
+            mock_window.display_image = DiagramWindow.display_image.__get__(mock_window, DiagramWindow)
+
+            # Mock image data
+            image_data = b'<svg>test</svg>'
+
+            # Call display_image
+            mock_window.display_image(image_data, "svg")
+
+            # Verify no scaling occurred
+            mock_pixmap.scaled.assert_not_called()
+            # Verify original pixmap was used
+            mock_label.setPixmap.assert_called_once_with(mock_pixmap)
+            # Verify label scaling is disabled
+            mock_label.setScaledContents.assert_called_once_with(False)
+
+
 class TestWindowState:
     """Test suite for window state persistence."""
 

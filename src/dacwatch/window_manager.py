@@ -38,6 +38,164 @@ class DiagramWindow(QMainWindow):
         self.loading_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.loading_label)
 
+        # Setup toolbar
+        self._setup_toolbar()
+
+    def display_image(self, image_data: bytes, format: str):
+        """
+        Display rendered diagram image in the window.
+
+        Args:
+            image_data: The image data as bytes
+            format: Image format ("svg" or "png")
+
+        Raises:
+            ValueError: If format is not supported
+        """
+        if format not in ["svg", "png"]:
+            raise ValueError("Format must be 'svg' or 'png'")
+
+        # Create image label
+        from PySide6.QtWidgets import QLabel
+        from PySide6.QtGui import QPixmap
+        from PySide6.QtCore import QByteArray
+
+        image_label = QLabel()
+        image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        # Create pixmap from image data
+        pixmap = QPixmap()
+        if format == "svg":
+            # For SVG, convert bytes to QByteArray
+            byte_array = QByteArray(image_data)
+            pixmap.loadFromData(byte_array)
+        else:  # PNG
+            pixmap.loadFromData(image_data)
+
+        # Auto-scale the image if it's larger than the window
+        window_width = self.width()
+        window_height = self.height()
+        image_width = pixmap.width()
+        image_height = pixmap.height()
+
+        # Calculate scale factors
+        width_scale = window_width / image_width if image_width > 0 else 1.0
+        height_scale = window_height / image_height if image_height > 0 else 1.0
+        scale_factor = min(width_scale, height_scale)
+
+        if scale_factor < 1.0:
+            # Image is larger than window, scale it down
+            new_width = int(image_width * scale_factor)
+            new_height = int(image_height * scale_factor)
+            pixmap = pixmap.scaled(new_width, new_height, Qt.AspectRatioMode.KeepAspectRatio)
+            image_label.setScaledContents(True)
+        else:
+            # Image fits in window, don't scale
+            image_label.setScaledContents(False)
+
+        # Set pixmap on label
+        image_label.setPixmap(pixmap)
+
+        # Replace loading label with image
+        central_widget = self.centralWidget()
+        if central_widget:
+            layout = central_widget.layout()
+            if layout and self.loading_label:
+                layout.removeWidget(self.loading_label)
+                self.loading_label.hide()
+            if layout:
+                layout.addWidget(image_label)
+
+        # Store reference to image label for potential future use
+        self.image_label = image_label
+
+    def _setup_toolbar(self):
+        """Setup the toolbar with action buttons."""
+        from PySide6.QtWidgets import QToolBar, QPushButton
+        from PySide6.QtCore import Qt
+
+        # Create toolbar
+        toolbar = QToolBar("Diagram Actions")
+        self.addToolBar(Qt.ToolBarArea.TopToolBarArea, toolbar)
+
+        # Toggle format button
+        self.toggle_button = QPushButton("Toggle SVG/PNG")
+        self.toggle_button.clicked.connect(self.toggle_format)
+        toolbar.addWidget(self.toggle_button)
+
+        # Copy image button
+        self.copy_image_button = QPushButton("Copy Image")
+        self.copy_image_button.clicked.connect(self.copy_image_to_clipboard)
+        toolbar.addWidget(self.copy_image_button)
+
+        # Copy source button
+        self.copy_source_button = QPushButton("Copy Source")
+        self.copy_source_button.clicked.connect(self.copy_source_to_clipboard)
+        toolbar.addWidget(self.copy_source_button)
+
+        # Reveal in Finder button
+        self.reveal_button = QPushButton("Reveal in Finder")
+        self.reveal_button.clicked.connect(self.reveal_in_finder)
+        toolbar.addWidget(self.reveal_button)
+
+        # Store current format and image data
+        self.current_format = "svg"  # Default to SVG
+        self.image_data = None
+
+    def toggle_format(self):
+        """Toggle between SVG and PNG formats."""
+        if not hasattr(self, 'image_data') or self.image_data is None:
+            return
+
+        # Toggle format
+        self.current_format = "png" if self.current_format == "svg" else "svg"
+
+        # Re-display with new format
+        self.display_image(self.image_data, self.current_format)
+
+    def copy_image_to_clipboard(self):
+        """Copy the current image to clipboard."""
+        if not hasattr(self, 'image_data') or self.image_data is None:
+            return
+
+        from PySide6.QtWidgets import QApplication
+        from PySide6.QtGui import QPixmap, QImage
+        from PySide6.QtCore import QBuffer, QIODevice, QByteArray
+
+        # Create pixmap from current image data
+        pixmap = QPixmap()
+        if self.current_format == "svg":
+            byte_array = QByteArray(self.image_data)
+            pixmap.loadFromData(byte_array)
+        else:
+            pixmap.loadFromData(self.image_data)
+
+        # Copy to clipboard
+        clipboard = QApplication.clipboard()
+        clipboard.setImage(pixmap.toImage())
+
+    def copy_source_to_clipboard(self):
+        """Copy the source code to clipboard."""
+        try:
+            with open(self.file_path, 'r') as f:
+                source_code = f.read()
+
+            from PySide6.QtWidgets import QApplication
+            clipboard = QApplication.clipboard()
+            clipboard.setText(source_code)
+        except (IOError, OSError):
+            # If we can't read the file, just continue
+            pass
+
+    def reveal_in_finder(self):
+        """Reveal the file in Finder (macOS)."""
+        import subprocess
+        try:
+            subprocess.run(['open', '-R', self.file_path])
+        except (subprocess.SubprocessError, OSError):
+            # If subprocess fails, just continue
+            pass
+
 
 class WindowManager:
     """Manages the mapping between files and their corresponding windows."""

@@ -42,9 +42,9 @@
 ## Phase 5: PySide GUI Components (Limited TDD)
 - [x] **Main Application**: Test QApplication initialization logic, then implement
 - [x] **Diagram Window**: Test window creation/setup (mock Qt), then implement
-- [ ] **Image Display**: Test image loading logic, then implement
-- [ ] **Toolbar/Menu**: Test button creation/signals, then implement
-- [ ] **Auto-scaling**: Test scaling calculations, then implement
+- [x] **Image Display**: Test image loading logic, then implement
+- [x] **Toolbar/Menu**: Test button creation/signals, then implement
+- [x] **Auto-scaling**: Test scaling calculations, then implement
 - [ ] **Manual Validation**: Visual testing of GUI components and interactions
 
 ## Phase 6: User Interactions (Limited TDD)
