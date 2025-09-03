@@ -124,20 +124,24 @@ class DiagramWindow(QMainWindow):
         central_widget = self.centralWidget()
         if central_widget:
             layout = central_widget.layout()
-            if layout and self.loading_label:
-                layout.removeWidget(self.loading_label)
-                self.loading_label.hide()
-            # Remove existing image if present
-            if hasattr(self, 'image_label') and hasattr(self, '_previous_image_label') and self._previous_image_label and layout:
-                try:
-                    layout.removeWidget(self._previous_image_label)
-                except (RuntimeError, AttributeError):
-                    pass  # Widget may have already been removed or deleted
             if layout:
+                # Remove loading label on first display
+                if self.loading_label and self.loading_label.isVisible():
+                    layout.removeWidget(self.loading_label)
+                    self.loading_label.hide()
+                
+                # Remove existing image widget if present
+                if hasattr(self, 'image_label') and self.image_label is not None:
+                    try:
+                        layout.removeWidget(self.image_label)
+                        self.image_label.deleteLater()  # Properly delete the old widget
+                    except (RuntimeError, AttributeError):
+                        pass  # Widget may have already been removed or deleted
+                
+                # Add new image widget
                 layout.addWidget(image_label)
 
         # Store references for potential future use
-        self._previous_image_label = getattr(self, 'image_label', None)
         self.image_label = image_label
         
         # Store image data for format toggling

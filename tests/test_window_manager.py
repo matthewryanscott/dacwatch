@@ -812,6 +812,64 @@ class TestDiagramWindowHighDPI:
         assert pixmap.height() == expected_physical_height
         assert pixmap.devicePixelRatio() == device_ratio
 
+    def test_image_update_cleanup(self, qtbot):
+        """Test that old image widgets are properly removed when updating."""
+        from dacwatch.window_manager import DiagramWindow
+        from PySide6.QtWidgets import QLabel
+        
+        # Create a real DiagramWindow
+        window = DiagramWindow("/test/path.svg")
+        qtbot.addWidget(window)
+        
+        # Display first image
+        svg_data1 = b'<svg width="100" height="100"><rect fill="red" width="100" height="100"/></svg>'
+        window.display_image(svg_data1, "svg")
+        
+        # Get reference to first image widget
+        first_image_widget = window.image_label
+        assert first_image_widget is not None
+        
+        # Verify there's only one image label in the central widget
+        central_widget = window.centralWidget()
+        layout = central_widget.layout()
+        
+        # Count widgets in the main layout (excluding toolbar)
+        layout_widgets = []
+        if layout:
+            for i in range(layout.count()):
+                item = layout.itemAt(i)
+                if item:
+                    widget = item.widget()
+                    if widget and widget != window.loading_label:
+                        layout_widgets.append(widget)
+        
+        assert len(layout_widgets) == 1, f"Expected 1 widget in layout, found {len(layout_widgets)}: {[type(w).__name__ for w in layout_widgets]}"
+        assert layout_widgets[0] == first_image_widget
+        
+        # Display second image (simulating file update)
+        svg_data2 = b'<svg width="100" height="100"><circle fill="blue" cx="50" cy="50" r="50"/></svg>'
+        window.display_image(svg_data2, "svg")
+        
+        # Get reference to second image widget
+        second_image_widget = window.image_label
+        assert second_image_widget is not None
+        assert second_image_widget != first_image_widget  # Should be different widgets
+        
+        # Verify there's still only one widget in the layout
+        layout_widgets_after = []
+        if layout:
+            for i in range(layout.count()):
+                item = layout.itemAt(i)
+                if item:
+                    widget = item.widget()
+                    if widget and widget != window.loading_label:
+                        layout_widgets_after.append(widget)
+        
+        assert len(layout_widgets_after) == 1, f"Expected 1 widget in layout after update, found {len(layout_widgets_after)}"
+        
+        # The widget should be the second (new) one
+        assert layout_widgets_after[0] == second_image_widget
+
 
 
 
