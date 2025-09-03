@@ -2,6 +2,7 @@ import pytest
 import asyncio
 from pathlib import Path
 import sys
+from unittest.mock import patch, MagicMock
 
 # Add the project root to Python path
 sys.path.insert(0, str(Path(__file__).parent.parent))
@@ -66,3 +67,63 @@ async def test_app_run_with_timeout(tmp_path):
 
     # App should be stopped after cancellation
     assert app.is_running is False
+
+
+@pytest.mark.asyncio
+async def test_qapplication_initialization_no_existing_instance(tmp_path):
+    """Test QApplication initialization when no instance exists."""
+    directory = tmp_path / "test_dir"
+    directory.mkdir()
+    config = Config(directory=directory)
+
+    with patch('dacwatch.app.QApplication') as mock_qapp_class:
+        mock_qapp_instance = MagicMock()
+        mock_qapp_class.instance.return_value = None
+        mock_qapp_class.return_value = mock_qapp_instance
+
+        app = DaCWatchApp(config)
+        await app.start()
+
+        # Verify QApplication was created
+        mock_qapp_class.assert_called_once_with([])
+        assert app.qt_app == mock_qapp_instance
+
+
+@pytest.mark.asyncio
+async def test_qapplication_initialization_existing_instance(tmp_path):
+    """Test QApplication initialization when instance already exists."""
+    directory = tmp_path / "test_dir"
+    directory.mkdir()
+    config = Config(directory=directory)
+
+    with patch('dacwatch.app.QApplication') as mock_qapp_class:
+        mock_existing_instance = MagicMock()
+        mock_qapp_class.instance.return_value = mock_existing_instance
+
+        app = DaCWatchApp(config)
+        await app.start()
+
+        # Verify QApplication was not created again
+        mock_qapp_class.assert_not_called()
+        assert app.qt_app is None  # Should remain None when instance exists
+
+
+@pytest.mark.asyncio
+async def test_qapplication_cleanup_on_stop(tmp_path):
+    """Test QApplication cleanup when app stops."""
+    directory = tmp_path / "test_dir"
+    directory.mkdir()
+    config = Config(directory=directory)
+
+    with patch('dacwatch.app.QApplication') as mock_qapp_class:
+        mock_qapp_instance = MagicMock()
+        mock_qapp_class.instance.return_value = None
+        mock_qapp_class.return_value = mock_qapp_instance
+
+        app = DaCWatchApp(config)
+        await app.start()
+        await app.stop()
+
+        # Verify app state is cleaned up
+        assert app.is_running is False
+        # Note: qt_app should still be set after stop for potential reuse

@@ -32,16 +32,16 @@
 - [x] **Manual Validation**: Open/close windows manually to verify behavior
 
 ## Phase 4: Kroki Integration (TDD)
-- [ ] **HTTP Client**: Test HTTP requests with mock aiohttp responses, then implement
-- [ ] **Diagram Type Detection**: Test extension-to-type mapping, then implement
-- [ ] **Request Builder**: Test API request formatting, then implement
-- [ ] **Response Handler**: Test SVG/PNG response parsing, then implement
-- [ ] **Error Handling**: Test network/API error scenarios, then implement
-- [ ] **Manual Validation**: Test with real Kroki service using sample diagrams
+- [x] **HTTP Client**: Test HTTP requests with mock aiohttp responses, then implement
+- [x] **Diagram Type Detection**: Test extension-to-type mapping, then implement
+- [x] **Request Builder**: Test API request formatting, then implement
+- [x] **Response Handler**: Test SVG/PNG response parsing, then implement
+- [x] **Error Handling**: Test network/API error scenarios, then implement
+- [x] **Manual Validation**: Test with real Kroki service using sample diagrams
 
 ## Phase 5: PySide GUI Components (Limited TDD)
-- [ ] **Main Application**: Test QApplication initialization logic, then implement
-- [ ] **Diagram Window**: Test window creation/setup (mock Qt), then implement
+- [x] **Main Application**: Test QApplication initialization logic, then implement
+- [x] **Diagram Window**: Test window creation/setup (mock Qt), then implement
 - [ ] **Image Display**: Test image loading logic, then implement
 - [ ] **Toolbar/Menu**: Test button creation/signals, then implement
 - [ ] **Auto-scaling**: Test scaling calculations, then implement
