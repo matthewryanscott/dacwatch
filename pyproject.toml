@@ -29,3 +29,8 @@ dev = [
     "pytest-asyncio>=1.1.0",
     "pytest-qt>=4.4.0",
 ]
+
+[tool.pytest.ini_options]
+qt_api = "pyside6"
+addopts = "-v"
+testpaths = ["tests"]

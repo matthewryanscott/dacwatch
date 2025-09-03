@@ -67,6 +67,11 @@ class DaCWatchApp:
             if window:
                 window.show()  # Make sure the window is visible
 
+                # Set up format toggle callback
+                window.format_toggle_callback = lambda new_format: asyncio.create_task(
+                    self._render_and_display_diagram(file_path, window, new_format)
+                )
+
                 # Render and display the diagram
                 try:
                     await self._render_and_display_diagram(file_path, window)
@@ -77,7 +82,7 @@ class DaCWatchApp:
             # Clean up window for deleted file
             self.window_manager.cleanup_deleted_file(file_path)
 
-    async def _render_and_display_diagram(self, file_path: str, window):
+    async def _render_and_display_diagram(self, file_path: str, window, format: str = "svg"):
         """Render a diagram and display it in the window."""
         try:
             # Read the file content
@@ -90,16 +95,16 @@ class DaCWatchApp:
                 print(f"Unsupported file type for {file_path}")
                 return
 
-            # Render the diagram (default to SVG)
-            image_data = await self.kroki_client.render_diagram(source_code, diagram_type, "svg")
+            # Render the diagram with specified format
+            image_data = await self.kroki_client.render_diagram(source_code, diagram_type, format)
 
             # Store the source and image data on the window for toolbar actions
             window.image_data = image_data
             window.source_code = source_code
-            window.current_format = "svg"
+            window.current_format = format
 
             # Display the image
-            window.display_image(image_data, "svg")
+            window.display_image(image_data, format)
 
         except FileNotFoundError:
             print(f"File not found: {file_path}")

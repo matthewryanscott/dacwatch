@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Callable
 from pathlib import Path
 import json
 import os
@@ -14,7 +14,9 @@ class DiagramWindow(QMainWindow):
     def __init__(self, file_path: str):
         super().__init__()
         self.file_path = file_path
-        self.loading_label = None
+        self.loading_label: Optional[QLabel] = None
+        self.format_label: Optional[QLabel] = None
+        self.format_toggle_callback: Optional[Callable[[str], None]] = None
         self._setup_ui()
 
     def _setup_ui(self):
@@ -96,6 +98,11 @@ class DiagramWindow(QMainWindow):
         # Set pixmap on label
         image_label.setPixmap(pixmap)
 
+        # Update format label
+        if self.format_label:
+            self.format_label.setText(f"Format: {format.upper()}")
+            self.format_label.show()
+
         # Replace loading label with image
         central_widget = self.centralWidget()
         if central_widget:
@@ -138,6 +145,12 @@ class DiagramWindow(QMainWindow):
         self.reveal_button.clicked.connect(self.reveal_in_finder)
         toolbar.addWidget(self.reveal_button)
 
+        # Create format label for toolbar
+        from PySide6.QtWidgets import QLabel
+        self.format_label = QLabel("")
+        self.format_label.setStyleSheet("color: gray; font-size: 12px; padding: 5px;")
+        toolbar.addWidget(self.format_label)
+
         # Store current format and image data
         self.current_format = "svg"  # Default to SVG
         self.image_data = None
@@ -148,10 +161,12 @@ class DiagramWindow(QMainWindow):
             return
 
         # Toggle format
-        self.current_format = "png" if self.current_format == "svg" else "svg"
-
-        # Re-display with new format
-        self.display_image(self.image_data, self.current_format)
+        new_format = "png" if self.current_format == "svg" else "svg"
+        
+        # We need to re-render with the new format, not just re-display
+        # This will be handled by the app when it connects to this signal
+        if hasattr(self, 'format_toggle_callback') and self.format_toggle_callback:
+            self.format_toggle_callback(new_format)
 
     def copy_image_to_clipboard(self):
         """Copy the current image to clipboard."""

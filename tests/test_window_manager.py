@@ -564,125 +564,122 @@ class TestDiagramWindowImageDisplay:
 class TestDiagramWindowToolbar:
     """Test suite for DiagramWindow toolbar functionality."""
 
-    def test_toggle_format_button_creation(self):
-        """Test that toggle format button is created and configured."""
-        from unittest.mock import patch, Mock
+    def test_toggle_format_button_creation(self, qtbot):
+        """Test that toggle format button is created and configured using real Qt widgets."""
+        from dacwatch.window_manager import DiagramWindow
+        from PySide6.QtWidgets import QPushButton, QToolBar, QLabel
+        
+        # Create a real DiagramWindow
+        window = DiagramWindow("/path/to/test/file.dot")
+        qtbot.addWidget(window)
+        
+        # Check that toolbars exist
+        toolbars = window.findChildren(QToolBar)
+        assert len(toolbars) >= 1
+        
+        toolbar = toolbars[0]
+        
+        # Find buttons in the toolbar
+        buttons = toolbar.findChildren(QPushButton)
+        toggle_button = None
+        for button in buttons:
+            if "Toggle" in button.text():
+                toggle_button = button
+                break
+        
+        assert toggle_button is not None, "Toggle SVG/PNG button should exist"
+        
+        # Check that format label exists
+        assert hasattr(window, 'format_label')
+        assert window.format_label is not None
+        
+        # Verify the format label is a QLabel
+        assert isinstance(window.format_label, QLabel)
+        
+        # Check that format label is in the toolbar
+        labels_in_toolbar = toolbar.findChildren(QLabel)
+        assert window.format_label in labels_in_toolbar
 
-        with patch('PySide6.QtWidgets.QPushButton') as mock_button, \
-             patch('PySide6.QtWidgets.QToolBar') as mock_toolbar:
-
-            mock_toggle_button = Mock()
-            mock_button.return_value = mock_toggle_button
-
-            mock_toolbar_instance = Mock()
-            mock_toolbar.return_value = mock_toolbar_instance
-
-            # Create a mock window object to test the method
-            mock_window = Mock()
-            mock_window.file_path = "/path/to/test/file.dot"
-            mock_window.addToolBar = Mock()
-
-            # Import and bind the method to our mock
-            from dacwatch.window_manager import DiagramWindow
-            mock_window._setup_toolbar = DiagramWindow._setup_toolbar.__get__(mock_window, DiagramWindow)
-
-            # Call _setup_toolbar
-            mock_window._setup_toolbar()
-
-            # Verify toggle format button was created (should be first call)
-            assert mock_button.call_args_list[0][0][0] == "Toggle SVG/PNG"
-            # Verify button was added to toolbar
-            assert mock_toolbar_instance.addWidget.call_count >= 1
-
-    def test_copy_image_button_creation(self):
+    def test_copy_image_button_creation(self, qtbot):
         """Test that copy image button is created and configured."""
-        from unittest.mock import patch, Mock
+        from dacwatch.window_manager import DiagramWindow
+        from PySide6.QtWidgets import QPushButton, QToolBar
+        
+        # Create a real DiagramWindow
+        window = DiagramWindow("/path/to/test/file.dot")
+        qtbot.addWidget(window)
+        
+        # Check that toolbars exist
+        toolbars = window.findChildren(QToolBar)
+        assert len(toolbars) >= 1
+        
+        toolbar = toolbars[0]
+        
+        # Find copy image button
+        buttons = toolbar.findChildren(QPushButton)
+        copy_button = None
+        for button in buttons:
+            if "Copy Image" in button.text():
+                copy_button = button
+                break
+        
+        assert copy_button is not None, "Copy Image button should exist"
 
-        with patch('PySide6.QtWidgets.QPushButton') as mock_button, \
-             patch('PySide6.QtWidgets.QHBoxLayout') as mock_layout, \
-             patch('PySide6.QtWidgets.QToolBar') as mock_toolbar:
-
-            mock_copy_button = Mock()
-            mock_button.return_value = mock_copy_button
-
-            mock_toolbar_instance = Mock()
-            mock_toolbar.return_value = mock_toolbar_instance
-
-            # Create a mock window object to test the method
-            mock_window = Mock()
-            mock_window.file_path = "/path/to/test/file.dot"
-
-            # Import and bind the method to our mock
-            from dacwatch.window_manager import DiagramWindow
-            mock_window._setup_toolbar = DiagramWindow._setup_toolbar.__get__(mock_window, DiagramWindow)
-
-            # Call _setup_toolbar
-            mock_window._setup_toolbar()
-
-            # Verify copy image button was created
-            assert mock_button.call_count >= 2  # At least toggle and copy buttons
-            # Verify buttons were added to toolbar
-            assert mock_toolbar_instance.addWidget.call_count >= 2
-
-    def test_copy_source_button_creation(self):
+    def test_copy_source_button_creation(self, qtbot):
         """Test that copy source button is created and configured."""
-        from unittest.mock import patch, Mock
+        from dacwatch.window_manager import DiagramWindow
+        from PySide6.QtWidgets import QPushButton, QToolBar
+        
+        # Create a real DiagramWindow
+        window = DiagramWindow("/path/to/test/file.dot")
+        qtbot.addWidget(window)
+        
+        # Check that toolbars exist
+        toolbars = window.findChildren(QToolBar)
+        assert len(toolbars) >= 1
+        
+        toolbar = toolbars[0]
+        
+        # Find copy source button
+        buttons = toolbar.findChildren(QPushButton)
+        copy_source_button = None
+        for button in buttons:
+            if "Copy Source" in button.text():
+                copy_source_button = button
+                break
+        
+        assert copy_source_button is not None, "Copy Source button should exist"
 
-        with patch('PySide6.QtWidgets.QPushButton') as mock_button, \
-             patch('PySide6.QtWidgets.QHBoxLayout') as mock_layout, \
-             patch('PySide6.QtWidgets.QToolBar') as mock_toolbar:
-
-            mock_copy_source_button = Mock()
-            mock_button.return_value = mock_copy_source_button
-
-            mock_toolbar_instance = Mock()
-            mock_toolbar.return_value = mock_toolbar_instance
-
-            # Create a mock window object to test the method
-            mock_window = Mock()
-            mock_window.file_path = "/path/to/test/file.dot"
-
-            # Import and bind the method to our mock
-            from dacwatch.window_manager import DiagramWindow
-            mock_window._setup_toolbar = DiagramWindow._setup_toolbar.__get__(mock_window, DiagramWindow)
-
-            # Call _setup_toolbar
-            mock_window._setup_toolbar()
-
-            # Verify copy source button was created
-            assert mock_button.call_count >= 3  # toggle, copy image, copy source buttons
-            # Verify buttons were added to toolbar
-            assert mock_toolbar_instance.addWidget.call_count >= 3
-
-    def test_reveal_finder_button_creation(self):
-        """Test that reveal in finder button is created and configured."""
-        from unittest.mock import patch, Mock
-
-        with patch('PySide6.QtWidgets.QPushButton') as mock_button, \
-             patch('PySide6.QtWidgets.QHBoxLayout') as mock_layout, \
-             patch('PySide6.QtWidgets.QToolBar') as mock_toolbar:
-
-            mock_reveal_button = Mock()
-            mock_button.return_value = mock_reveal_button
-
-            mock_toolbar_instance = Mock()
-            mock_toolbar.return_value = mock_toolbar_instance
-
-            # Create a mock window object to test the method
-            mock_window = Mock()
-            mock_window.file_path = "/path/to/test/file.dot"
-
-            # Import and bind the method to our mock
-            from dacwatch.window_manager import DiagramWindow
-            mock_window._setup_toolbar = DiagramWindow._setup_toolbar.__get__(mock_window, DiagramWindow)
-
-            # Call _setup_toolbar
-            mock_window._setup_toolbar()
-
-            # Verify reveal button was created
-            assert mock_button.call_count >= 4  # toggle, copy image, copy source, reveal buttons
-            # Verify buttons were added to toolbar
-            assert mock_toolbar_instance.addWidget.call_count >= 4
+    def test_reveal_finder_button_creation(self, qtbot):
+        """Test that reveal in Finder button is created and configured."""
+        from dacwatch.window_manager import DiagramWindow
+        from PySide6.QtWidgets import QPushButton, QToolBar
+        
+        # Create a real DiagramWindow
+        window = DiagramWindow("/path/to/test/file.dot")
+        qtbot.addWidget(window)
+        
+        # Check that toolbars exist
+        toolbars = window.findChildren(QToolBar)
+        assert len(toolbars) >= 1
+        
+        toolbar = toolbars[0]
+        
+        # Find reveal in Finder button
+        buttons = toolbar.findChildren(QPushButton)
+        reveal_button = None
+        for button in buttons:
+            if "Reveal in Finder" in button.text():
+                reveal_button = button
+                break
+        
+        assert reveal_button is not None, "Reveal in Finder button should exist"
+        
+        # Verify we have all expected buttons
+        button_texts = [button.text() for button in buttons]
+        expected_buttons = ["Toggle SVG/PNG", "Copy Image", "Copy Source", "Reveal in Finder"]
+        for expected in expected_buttons:
+            assert expected in button_texts, f"Button '{expected}' should exist"
 
     def test_toggle_format_functionality(self):
         """Test toggle format functionality."""
@@ -692,7 +689,7 @@ class TestDiagramWindowToolbar:
         mock_window = Mock()
         mock_window.current_format = "svg"
         mock_window.image_data = b'<svg>test</svg>'
-        mock_window.display_image = Mock()
+        mock_window.format_toggle_callback = Mock()
 
         # Import and bind the method to our mock
         from dacwatch.window_manager import DiagramWindow
@@ -701,10 +698,33 @@ class TestDiagramWindowToolbar:
         # Call toggle_format
         mock_window.toggle_format()
 
-        # Verify display_image was called with PNG format
-        mock_window.display_image.assert_called_once_with(b'<svg>test</svg>', "png")
-        # Verify format was toggled
-        assert mock_window.current_format == "png"
+        # Verify callback was called with PNG format
+        mock_window.format_toggle_callback.assert_called_once_with("png")
+
+    def test_format_label_functionality(self, qtbot):
+        """Test that format label shows correct format and updates properly."""
+        from dacwatch.window_manager import DiagramWindow
+        from PySide6.QtWidgets import QLabel
+        
+        # Create a real DiagramWindow
+        window = DiagramWindow("/path/to/test/file.dot")
+        qtbot.addWidget(window)
+        
+        # Check that format label exists
+        assert hasattr(window, 'format_label')
+        assert isinstance(window.format_label, QLabel)
+        
+        # Test display_image updates format label
+        test_svg_data = b'<svg>test</svg>'
+        test_png_data = b'PNG\x89test'
+        
+        # Test SVG format
+        window.display_image(test_svg_data, "svg")
+        assert window.format_label.text() == "Format: SVG"
+        
+        # Test PNG format
+        window.display_image(test_png_data, "png")
+        assert window.format_label.text() == "Format: PNG"
 
     def test_copy_image_to_clipboard(self):
         """Test copying image to clipboard."""
