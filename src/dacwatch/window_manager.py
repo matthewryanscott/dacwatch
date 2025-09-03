@@ -42,6 +42,9 @@ class DiagramWindow(QMainWindow):
 
         # Setup toolbar
         self._setup_toolbar()
+        
+        # Setup keyboard shortcuts
+        self._setup_shortcuts()
 
     def display_image(self, image_data: bytes, format: str):
         """
@@ -187,6 +190,15 @@ class DiagramWindow(QMainWindow):
         # Store current format and image data
         self.current_format = "svg"  # Default to SVG
         self.image_data = None
+
+    def _setup_shortcuts(self):
+        """Setup keyboard shortcuts."""
+        from PySide6.QtGui import QShortcut, QKeySequence
+        from PySide6.QtCore import Qt
+        
+        # Command-W (or Ctrl-W on non-Mac) to close window
+        close_shortcut = QShortcut(QKeySequence.StandardKey.Close, self)
+        close_shortcut.activated.connect(self.close)
 
     def toggle_format(self):
         """Toggle between SVG and PNG formats."""
