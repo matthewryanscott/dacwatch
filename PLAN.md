@@ -18,11 +18,11 @@
 - [x] **Manual Validation**: Run `uv run main.py --help` to verify CLI works
 
 ## Phase 2: File Watching System (TDD)
-- [ ] **Async File Watcher**: Test directory monitoring with mock filesystem, then implement
-- [ ] **Event Handling**: Test event detection with temporary files, then implement
-- [ ] **File Filter**: Test file type filtering logic, then implement
-- [ ] **Event Queue**: Test event buffering/debouncing, then implement
-- [ ] **Manual Validation**: Create/modify/delete test files to verify watching works
+- [x] **Async File Watcher**: Test directory monitoring with mock filesystem, then implement
+- [x] **Event Handling**: Test event detection with temporary files, then implement
+- [x] **File Filter**: Test file type filtering logic, then implement
+- [x] **Event Queue**: Test event buffering/debouncing, then implement
+- [x] **Manual Validation**: Create/modify/delete test files to verify watching works
 
 ## Phase 3: Window Management (TDD)
 - [ ] **Window Registry**: Test file-to-window mapping, then implement
