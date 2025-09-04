@@ -12,8 +12,9 @@ from PySide6.QtGui import QPainter
 class ZoomableGraphicsView(QGraphicsView):
     """A QGraphicsView with zoom and pan capabilities via mouse wheel and gestures."""
 
-    def __init__(self):
+    def __init__(self, parent_window=None):
         super().__init__()
+        self.parent_window = parent_window
         self.setDragMode(QGraphicsView.DragMode.RubberBandDrag)
         self.setRenderHint(QPainter.RenderHint.Antialiasing)
         self.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
@@ -31,18 +32,9 @@ class ZoomableGraphicsView(QGraphicsView):
         self.zoom_factor_base = 1.0015
 
     def wheelEvent(self, event):
-        """Handle mouse wheel zoom."""
-        # Calculate zoom factor
-        angle = event.angleDelta().y()
-        factor = pow(self.zoom_factor_base, angle)
-        
-        # Apply zoom with limits
-        current_scale = self.transform().m11()
-        if (current_scale * factor < self.min_zoom and factor < 1) or \
-           (current_scale * factor > self.max_zoom and factor > 1):
-            return
-            
-        self.scale(factor, factor)
+        """Handle mouse wheel for scrolling (not zooming)."""
+        # Let the default scroll behavior handle wheel events
+        super().wheelEvent(event)
 
     def event(self, event):
         """Handle gesture events for pinch-to-zoom."""
@@ -65,11 +57,15 @@ class ZoomableGraphicsView(QGraphicsView):
                     return True
                 
                 self.scale(scale_factor, scale_factor)
+                
+                # Notify parent window of zoom change if available
+                if self.parent_window and hasattr(self.parent_window, 'current_zoom_scale'):
+                    self.parent_window.current_zoom_scale = self.get_current_scale()
             return True
         return False
 
-    def fit_in_view_with_margin(self, rect, margin_percent=10):
-        """Fit the given rect in view with a margin."""
+    def fit_in_view_with_margin(self, rect, margin_percent=10, scale_factor=2.0):
+        """Fit the given rect in view with a margin and apply a scale factor."""
         if rect.isNull():
             return
             
@@ -78,12 +74,28 @@ class ZoomableGraphicsView(QGraphicsView):
         margin_y = rect.height() * (margin_percent / 100.0)
         expanded_rect = rect.adjusted(-margin_x, -margin_y, margin_x, margin_y)
         
+        # Fit in view first
         self.fitInView(expanded_rect, Qt.AspectRatioMode.KeepAspectRatio)
+        
+        # Then apply additional scale factor (2x by default for better visibility)
+        self.scale(scale_factor, scale_factor)
 
     def reset_zoom(self):
-        """Reset zoom to fit the scene contents."""
+        """Reset zoom to fit the scene contents at 2x scale."""
         if self.scene():
             self.fit_in_view_with_margin(self.scene().itemsBoundingRect())
+            
+    def get_current_scale(self):
+        """Get the current scale factor."""
+        return self.transform().m11()
+        
+    def set_scale(self, scale_factor):
+        """Set absolute scale factor."""
+        current_scale = self.get_current_scale()
+        if current_scale > 0:
+            # Reset transform and apply new scale
+            self.resetTransform()
+            self.scale(scale_factor, scale_factor)
 
 
 class DiagramWindow(QMainWindow):
@@ -95,6 +107,8 @@ class DiagramWindow(QMainWindow):
         self.loading_label: Optional[QLabel] = None
         self.format_label: Optional[QLabel] = None
         self.format_toggle_callback: Optional[Callable[[str], None]] = None
+        self.current_zoom_scale: float = 2.0  # Store current zoom level
+        self.is_first_display: bool = True  # Track if this is the first image display
         self._setup_ui()
 
     def _setup_ui(self):
@@ -187,7 +201,7 @@ class DiagramWindow(QMainWindow):
             pixmap.setDevicePixelRatio(device_pixel_ratio)
         
         # Create graphics view and scene for zoomable display
-        graphics_view = ZoomableGraphicsView()
+        graphics_view = ZoomableGraphicsView(parent_window=self)
         graphics_scene = QGraphicsScene()
         
         # Create pixmap item and add to scene
@@ -200,8 +214,19 @@ class DiagramWindow(QMainWindow):
         # Set white background for the graphics view
         graphics_view.setStyleSheet("QGraphicsView { background-color: white; }")
         
-        # Fit image in view with margin
-        graphics_view.fit_in_view_with_margin(pixmap_item.boundingRect())
+        # Save current zoom before replacing view (only if not first display)
+        if not self.is_first_display and hasattr(self, 'graphics_view') and self.graphics_view:
+            self.current_zoom_scale = self.graphics_view.get_current_scale()
+        
+        if self.is_first_display:
+            # First time - fit to view with 2x scale
+            graphics_view.fit_in_view_with_margin(pixmap_item.boundingRect(), scale_factor=2.0)
+            self.current_zoom_scale = 2.0
+            self.is_first_display = False
+        else:
+            # Subsequent updates - fit to view first, then apply saved scale
+            graphics_view.fit_in_view_with_margin(pixmap_item.boundingRect(), scale_factor=1.0)
+            graphics_view.set_scale(self.current_zoom_scale)
 
         # Update format label
         if self.format_label:
@@ -521,16 +546,19 @@ class DiagramWindow(QMainWindow):
         """Zoom in on the image."""
         if hasattr(self, 'graphics_view') and self.graphics_view:
             self.graphics_view.scale(1.25, 1.25)
+            self.current_zoom_scale = self.graphics_view.get_current_scale()
 
     def zoom_out(self):
         """Zoom out on the image."""
         if hasattr(self, 'graphics_view') and self.graphics_view:
             self.graphics_view.scale(0.8, 0.8)
+            self.current_zoom_scale = self.graphics_view.get_current_scale()
 
     def reset_zoom(self):
-        """Reset zoom to fit the image."""
+        """Reset zoom to fit the image at 2x scale."""
         if hasattr(self, 'graphics_view') and self.graphics_view:
             self.graphics_view.reset_zoom()
+            self.current_zoom_scale = 2.0  # Reset to default 2x scale
 
 
 class WindowManager:
