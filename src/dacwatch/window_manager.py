@@ -5,8 +5,50 @@ import os
 
 # PySide imports
 from PySide6.QtWidgets import QMainWindow, QLabel, QVBoxLayout, QWidget, QGraphicsView, QGraphicsScene, QGraphicsPixmapItem
-from PySide6.QtCore import Qt, QEvent
+from PySide6.QtCore import Qt, QEvent, QTimer, QPropertyAnimation, QEasingCurve
 from PySide6.QtGui import QPainter
+
+
+class ToastWidget(QLabel):
+    """A toast notification widget that appears briefly over the main window."""
+    
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.setStyleSheet("""
+            QLabel {
+                background-color: rgba(0, 0, 0, 180);
+                color: white;
+                border-radius: 8px;
+                padding: 12px 24px;
+                font-size: 14px;
+                font-weight: bold;
+            }
+        """)
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self.hide()
+    
+    def show_toast(self, message: str, duration_ms: int = 500):
+        """Show the toast with a message for the specified duration."""
+        self.setText(message)
+        self.adjustSize()
+        
+        # Position in center of parent widget
+        from PySide6.QtWidgets import QWidget
+        parent_widget = self.parent()
+        if isinstance(parent_widget, QWidget):
+            parent_rect = parent_widget.rect()
+            x = parent_rect.center().x() - self.width() // 2
+            y = parent_rect.center().y() - self.height() // 2
+            self.move(x, y)
+            self.setGeometry(x, y, self.width(), self.height())
+        
+        self.show()
+        self.raise_()
+        self.repaint()  # Force immediate update
+        
+        # Auto-hide after duration
+        QTimer.singleShot(duration_ms, self.hide)
 
 
 class ZoomableGraphicsView(QGraphicsView):
@@ -140,6 +182,9 @@ class DiagramWindow(QMainWindow):
         
         # Setup keyboard shortcuts
         self._setup_shortcuts()
+        
+        # Setup toast notification
+        self.toast = ToastWidget(self)
         
         # Connect checkbox signal after method is defined
         self.always_on_top_checkbox.toggled.connect(self.toggle_always_on_top)
@@ -522,7 +567,7 @@ class DiagramWindow(QMainWindow):
 
         # Convert to QImage with explicit transparency support
         image = pixmap.toImage()
-        
+
         # Ensure the image has an alpha channel for transparency
         if image.format() != QImage.Format.Format_ARGB32:
             image = image.convertToFormat(QImage.Format.Format_ARGB32)
@@ -530,6 +575,9 @@ class DiagramWindow(QMainWindow):
         # Copy to clipboard
         clipboard = QApplication.clipboard()
         clipboard.setImage(image)
+        
+        # Show toast notification
+        self.toast.show_toast("Copied image")
 
     def copy_source_to_clipboard(self):
         """Copy the source code to clipboard."""
@@ -540,8 +588,11 @@ class DiagramWindow(QMainWindow):
             from PySide6.QtWidgets import QApplication
             clipboard = QApplication.clipboard()
             clipboard.setText(source_code)
-        except (IOError, OSError):
-            # If we can't read the file, just continue
+            
+            # Show toast notification
+            self.toast.show_toast("Copied source")
+        except Exception:
+            # Silently ignore file read errors
             pass
 
     def copy_error_to_clipboard(self):

@@ -755,6 +755,59 @@ class TestDiagramWindowToolbar:
             qtbot.wait(10)
             mock_reveal_finder.assert_called_once()
 
+    def test_toast_notifications(self, qtbot):
+        """Test toast notifications appear when copying."""
+        from dacwatch.window_manager import DiagramWindow
+        import tempfile
+        import os
+        
+        # Create a temporary file for testing
+        svg_content = '''<?xml version="1.0" encoding="UTF-8"?>
+<svg width="100" height="100" xmlns="http://www.w3.org/2000/svg">
+    <rect x="10" y="10" width="80" height="80" fill="blue"/>
+</svg>'''
+        
+        with tempfile.NamedTemporaryFile(mode='w', suffix='.svg', delete=False) as f:
+            f.write(svg_content)
+            temp_file = f.name
+        
+        try:
+            # Create a real window with the temp file
+            window = DiagramWindow(temp_file)
+            qtbot.addWidget(window)
+            window.show()
+            qtbot.waitForWindowShown(window)
+            
+            # Load the content so we can copy
+            window.display_image(svg_content.encode(), "svg")
+            
+            # Verify toast widget exists
+            assert hasattr(window, 'toast')
+            assert window.toast is not None
+            
+            # Initially toast should be hidden
+            assert not window.toast.isVisible()
+            
+            # Test image copy toast
+            window.copy_image_to_clipboard()
+            qtbot.wait(10)  # Small wait for UI update
+            assert window.toast.isVisible()
+            assert window.toast.text() == "Copied image"
+            
+            # Wait for toast to disappear
+            qtbot.wait(600)  # Toast duration is 500ms plus buffer
+            assert not window.toast.isVisible()
+            
+            # Test source copy toast  
+            window.copy_source_to_clipboard()
+            qtbot.wait(10)  # Small wait for UI update
+            assert window.toast.isVisible()
+            assert window.toast.text() == "Copied source"
+        
+        finally:
+            # Clean up temp file
+            os.unlink(temp_file)
+
     def test_copy_source_to_clipboard(self):
         """Test copying source code to clipboard."""
         from unittest.mock import patch, Mock
