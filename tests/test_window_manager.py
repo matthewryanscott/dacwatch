@@ -654,40 +654,58 @@ class TestDiagramWindowToolbar:
         window.display_image(test_png_data, "png")
         assert window.format_label.text() == "Format: PNG"
 
-    def test_copy_image_to_clipboard(self):
-        """Test copying image to clipboard."""
-        from unittest.mock import patch, Mock
+    def test_copy_image_to_clipboard(self, qtbot):
+        """Test copying image to clipboard with transparency validation."""
+        # Create SVG content with transparent background and semi-transparent element
+        svg_content = '''<?xml version="1.0" encoding="UTF-8"?>
+<svg width="100" height="100" xmlns="http://www.w3.org/2000/svg">
+    <rect x="20" y="20" width="60" height="60" fill="red" opacity="0.5"/>
+</svg>'''
 
-        with patch('PySide6.QtWidgets.QApplication') as mock_qapp, \
-             patch('PySide6.QtGui.QPixmap') as mock_pixmap, \
-             patch('PySide6.QtCore.QByteArray') as mock_qbytearray:
+        # Create a real window
+        from dacwatch.window_manager import DiagramWindow
+        window = DiagramWindow("test.svg")
+        qtbot.addWidget(window)
 
-            mock_clipboard_instance = Mock()
-            mock_qapp.clipboard.return_value = mock_clipboard_instance
+        # Load the SVG content
+        window.display_image(svg_content.encode(), "svg")
 
-            mock_pixmap_instance = Mock()
-            mock_image = Mock()
-            mock_pixmap_instance.toImage.return_value = mock_image
-            mock_pixmap.return_value = mock_pixmap_instance
+        # Verify pixmap_item exists
+        assert hasattr(window, 'pixmap_item')
+        assert window.pixmap_item is not None
 
-            mock_byte_array = Mock()
-            mock_qbytearray.return_value = mock_byte_array
+        # Copy to clipboard
+        window.copy_image_to_clipboard()
 
-            # Create a mock window object
-            mock_window = Mock()
-            mock_window.image_data = b'<svg>test</svg>'
-            mock_window.current_format = "svg"
+        # Get clipboard image
+        from PySide6.QtWidgets import QApplication
+        from PySide6.QtGui import QImage
+        clipboard = QApplication.clipboard()
+        clipboard_image = clipboard.image()
+        
+        # Basic validation
+        assert not clipboard_image.isNull()
+        assert clipboard_image.hasAlphaChannel()
+        assert clipboard_image.format() == QImage.Format.Format_ARGB32
 
-            # Import and bind the method to our mock
-            from dacwatch.window_manager import DiagramWindow
-            mock_window.copy_image_to_clipboard = DiagramWindow.copy_image_to_clipboard.__get__(mock_window, DiagramWindow)
-
-            # Call copy_image_to_clipboard
-            mock_window.copy_image_to_clipboard()
-
-            # Verify clipboard was accessed and data was set
-            mock_qapp.clipboard.assert_called_once()
-            mock_clipboard_instance.setImage.assert_called_once_with(mock_image)
+        # Validate actual transparency by checking corner pixels
+        # The SVG has a transparent background, so corners should be fully transparent
+        corner_pixel = clipboard_image.pixelColor(5, 5)  # Top-left corner
+        print(f"Corner pixel RGBA: {corner_pixel.red()}, {corner_pixel.green()}, {corner_pixel.blue()}, {corner_pixel.alpha()}")
+        
+        # Corner should be fully transparent (alpha = 0)
+        assert corner_pixel.alpha() == 0, f"Expected transparent corner but got alpha={corner_pixel.alpha()}"
+        
+        # Check a pixel inside the semi-transparent rectangle
+        center_pixel = clipboard_image.pixelColor(50, 50)
+        print(f"Center pixel RGBA: {center_pixel.red()}, {center_pixel.green()}, {center_pixel.blue()}, {center_pixel.alpha()}")
+        
+        # Center should have partial transparency (alpha between 0 and 255)
+        assert 0 < center_pixel.alpha() < 255, f"Expected semi-transparent center but got alpha={center_pixel.alpha()}"
+        
+        # Save clipboard image to file for manual verification (optional debug)
+        # clipboard_image.save("/tmp/clipboard_test.png", "PNG")
+        # print("Saved clipboard image to /tmp/clipboard_test.png for manual inspection")
 
     def test_copy_source_to_clipboard(self):
         """Test copying source code to clipboard."""

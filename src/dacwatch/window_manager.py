@@ -494,13 +494,22 @@ class DiagramWindow(QMainWindow):
             return
 
         from PySide6.QtWidgets import QApplication
+        from PySide6.QtGui import QImage
+        from PySide6.QtCore import QBuffer, QIODevice
 
         # Get pixmap from the graphics item
         pixmap = self.pixmap_item.pixmap()
 
+        # Convert to QImage with explicit transparency support
+        image = pixmap.toImage()
+        
+        # Ensure the image has an alpha channel for transparency
+        if image.format() != QImage.Format.Format_ARGB32:
+            image = image.convertToFormat(QImage.Format.Format_ARGB32)
+
         # Copy to clipboard
         clipboard = QApplication.clipboard()
-        clipboard.setImage(pixmap.toImage())
+        clipboard.setImage(image)
 
     def copy_source_to_clipboard(self):
         """Copy the source code to clipboard."""
