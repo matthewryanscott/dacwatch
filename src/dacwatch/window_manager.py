@@ -64,7 +64,7 @@ class ZoomableGraphicsView(QGraphicsView):
             return True
         return False
 
-    def fit_in_view_with_margin(self, rect, margin_percent=10, scale_factor=2.0):
+    def fit_in_view_with_margin(self, rect, margin_percent=10, scale_factor=1.0):
         """Fit the given rect in view with a margin and apply a scale factor."""
         if rect.isNull():
             return
@@ -81,9 +81,9 @@ class ZoomableGraphicsView(QGraphicsView):
         self.scale(scale_factor, scale_factor)
 
     def reset_zoom(self):
-        """Reset zoom to fit the scene contents at 2x scale."""
+        """Reset zoom to 1:1 pixel ratio (no scaling)."""
         if self.scene():
-            self.fit_in_view_with_margin(self.scene().itemsBoundingRect())
+            self.resetTransform()  # Reset to 1:1 pixel ratio
             
     def get_current_scale(self):
         """Get the current scale factor."""
@@ -107,7 +107,7 @@ class DiagramWindow(QMainWindow):
         self.loading_label: Optional[QLabel] = None
         self.format_label: Optional[QLabel] = None
         self.format_toggle_callback: Optional[Callable[[str], None]] = None
-        self.current_zoom_scale: float = 2.0  # Store current zoom level
+        self.current_zoom_scale: float = 1.0  # Store current zoom level
         self.is_first_display: bool = True  # Track if this is the first image display
         self._setup_ui()
 
@@ -179,7 +179,7 @@ class DiagramWindow(QMainWindow):
                 if default_size.isEmpty() or default_size.width() <= 0 or default_size.height() <= 0:
                     default_size = QSize(800, 600)
                 
-                # Render at high resolution for crisp display
+                # Render at high resolution for crisp display on high-DPI screens
                 display_width = int(default_size.width() * device_pixel_ratio)
                 display_height = int(default_size.height() * device_pixel_ratio)
                 
@@ -192,6 +192,7 @@ class DiagramWindow(QMainWindow):
                 svg_renderer.render(painter)
                 painter.end()
                 
+                # CRITICAL: Set device pixel ratio so Qt knows this is a high-DPI pixmap
                 pixmap.setDevicePixelRatio(device_pixel_ratio)
             else:
                 pixmap = QPixmap()
@@ -219,13 +220,13 @@ class DiagramWindow(QMainWindow):
             self.current_zoom_scale = self.graphics_view.get_current_scale()
         
         if self.is_first_display:
-            # First time - fit to view with 2x scale
-            graphics_view.fit_in_view_with_margin(pixmap_item.boundingRect(), scale_factor=2.0)
-            self.current_zoom_scale = 2.0
+            # First time - reset transform for true 1:1 display (no scaling)
+            graphics_view.resetTransform()
+            self.current_zoom_scale = 1.0
             self.is_first_display = False
         else:
-            # Subsequent updates - fit to view first, then apply saved scale
-            graphics_view.fit_in_view_with_margin(pixmap_item.boundingRect(), scale_factor=1.0)
+            # Subsequent updates - reset transform first, then apply saved scale
+            graphics_view.resetTransform()
             graphics_view.set_scale(self.current_zoom_scale)
 
         # Update format label
@@ -555,10 +556,10 @@ class DiagramWindow(QMainWindow):
             self.current_zoom_scale = self.graphics_view.get_current_scale()
 
     def reset_zoom(self):
-        """Reset zoom to fit the image at 2x scale."""
+        """Reset zoom to 1:1 pixel ratio (no scaling)."""
         if hasattr(self, 'graphics_view') and self.graphics_view:
             self.graphics_view.reset_zoom()
-            self.current_zoom_scale = 2.0  # Reset to default 2x scale
+            self.current_zoom_scale = 1.0  # Reset to 1:1 pixel ratio
 
 
 class WindowManager:
