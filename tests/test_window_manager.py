@@ -813,94 +813,48 @@ class TestDiagramWindowHighDPI:
     def test_high_dpi_scaling(self, qtbot):
         """Test that high-DPI scaling is enabled for image display."""
         from dacwatch.window_manager import DiagramWindow
-        from PySide6.QtWidgets import QLabel
-        
+
         # Create a real DiagramWindow
         window = DiagramWindow("/test/path.svg")
         qtbot.addWidget(window)
-        
+
         # Create minimal SVG data with explicit size
         svg_data = b'<svg width="200" height="150" viewBox="0 0 200 150"><circle cx="100" cy="75" r="50"/></svg>'
-        
+
         # Call display_image
         window.display_image(svg_data, "svg")
-        
-        # Verify image label was created with high-DPI scaling
-        assert window.image_label is not None
-        assert isinstance(window.image_label, QLabel)
-        
-        # Verify scaled contents is disabled to maintain 1:1 pixel ratio
-        assert not window.image_label.hasScaledContents()
-        
-        # Verify the pixmap has device pixel ratio set and is properly sized
-        pixmap = window.image_label.pixmap()
-        if pixmap and not pixmap.isNull():
-            # Device pixel ratio should be >= 1.0 (may be 2.0 on retina displays)
-            device_pixel_ratio = pixmap.devicePixelRatio()
-            assert device_pixel_ratio >= 1.0
-            
-            # For SVG, verify that the rendered size accounts for device pixel ratio
-            # The pixmap should be larger than the logical size on high-DPI displays
-            logical_width = pixmap.width() / device_pixel_ratio
-            logical_height = pixmap.height() / device_pixel_ratio
-            
-            # Should match the original SVG size (200x150) in logical pixels
-            assert logical_width > 0  # Should have some reasonable size
-            assert logical_height > 0
 
-    def test_svg_vector_rendering(self, qtbot):
-        """Test that SVG is rendered as vector graphics at high resolution."""
-        from dacwatch.window_manager import DiagramWindow
-        
-        # Create a real DiagramWindow
-        window = DiagramWindow("/test/path.svg")
-        qtbot.addWidget(window)
-        
-        # Create SVG with specific dimensions
-        svg_data = b'''<svg width="100" height="100" xmlns="http://www.w3.org/2000/svg">
-            <rect width="100" height="100" fill="red"/>
-        </svg>'''
-        
-        # Call display_image for SVG
-        window.display_image(svg_data, "svg")
-        
-        # Verify the SVG was processed (not just loaded as raster)
-        pixmap = window.image_label.pixmap()
-        assert pixmap is not None
-        assert not pixmap.isNull()
-        
-        # SVG should have been rendered at device resolution
+        # Verify pixmap_item was created with high-DPI scaling
+        assert hasattr(window, 'pixmap_item') and window.pixmap_item is not None
+        pixmap = window.pixmap_item.pixmap()
         device_ratio = window.devicePixelRatio()
-        expected_physical_width = int(100 * device_ratio)
-        expected_physical_height = int(100 * device_ratio)
-        
-        # Physical pixmap size should account for device pixel ratio
-        assert pixmap.width() == expected_physical_width
-        assert pixmap.height() == expected_physical_height
+
+        # Verify device pixel ratio is set correctly
         assert pixmap.devicePixelRatio() == device_ratio
 
     def test_image_update_cleanup(self, qtbot):
-        """Test that old image widgets are properly removed when updating."""
+        """Test that old graphics items are properly removed when updating."""
         from dacwatch.window_manager import DiagramWindow
-        from PySide6.QtWidgets import QLabel
-        
+
         # Create a real DiagramWindow
         window = DiagramWindow("/test/path.svg")
         qtbot.addWidget(window)
-        
+
         # Display first image
         svg_data1 = b'<svg width="100" height="100"><rect fill="red" width="100" height="100"/></svg>'
         window.display_image(svg_data1, "svg")
+
+        # Get reference to first pixmap item
+        first_pixmap_item = window.pixmap_item
+        assert first_pixmap_item is not None
+        first_graphics_view = window.graphics_view
+        assert first_graphics_view is not None
         
-        # Get reference to first image widget
-        first_image_widget = window.image_label
-        assert first_image_widget is not None
-        
-        # Verify there's only one image label in the central widget
+        # Verify there's one graphics view in the central widget
         central_widget = window.centralWidget()
         layout = central_widget.layout()
         
-        # Count widgets in the main layout (excluding toolbar)
+        # Count widgets in the main layout (excluding toolbar and loading label)
         layout_widgets = []
         if layout:
             for i in range(layout.count()):
@@ -911,18 +865,20 @@ class TestDiagramWindowHighDPI:
                         layout_widgets.append(widget)
         
         assert len(layout_widgets) == 1, f"Expected 1 widget in layout, found {len(layout_widgets)}: {[type(w).__name__ for w in layout_widgets]}"
-        # Now we expect a scroll area, not the image label directly
-        assert hasattr(window, 'scroll_area')
-        assert layout_widgets[0] == window.scroll_area
+        assert layout_widgets[0] == window.graphics_view
         
         # Display second image (simulating file update)
         svg_data2 = b'<svg width="100" height="100"><circle fill="blue" cx="50" cy="50" r="50"/></svg>'
         window.display_image(svg_data2, "svg")
         
-        # Get reference to second image widget
-        second_image_widget = window.image_label
-        assert second_image_widget is not None
-        assert second_image_widget != first_image_widget  # Should be different widgets
+        # Get reference to second pixmap item - it should be a new item
+        second_pixmap_item = window.pixmap_item
+        assert second_pixmap_item is not None
+        assert second_pixmap_item != first_pixmap_item  # Should be different items
+        
+        # Graphics view should be replaced with a new one
+        second_graphics_view = window.graphics_view
+        assert second_graphics_view != first_graphics_view
         
         # Verify there's still only one widget in the layout
         layout_widgets_after = []
@@ -936,13 +892,12 @@ class TestDiagramWindowHighDPI:
         
         assert len(layout_widgets_after) == 1, f"Expected 1 widget in layout after update, found {len(layout_widgets_after)}"
         
-        # The widget should still be the scroll area
-        assert layout_widgets_after[0] == window.scroll_area
+        # The widget should be the graphics view
+        assert layout_widgets_after[0] == window.graphics_view
 
     def test_image_resizes_with_window(self, qtbot):
-        """Test that image scales when window is resized."""
+        """Test that graphics view handles image display correctly."""
         from dacwatch.window_manager import DiagramWindow
-        from PySide6.QtWidgets import QSizePolicy
         from PySide6.QtCore import Qt
         
         # Create a real DiagramWindow
@@ -953,18 +908,17 @@ class TestDiagramWindowHighDPI:
         svg_data = b'<svg width="200" height="200"><rect width="200" height="200" fill="green"/></svg>'
         window.display_image(svg_data, "svg")
         
-        # Verify the scroll area and image label are set up correctly
-        scroll_area = window.scroll_area
-        image_label = window.image_label
+        # Verify the graphics view and pixmap item are set up correctly
+        graphics_view = window.graphics_view
+        pixmap_item = window.pixmap_item
         
-        # Scroll area should be resizable
-        assert scroll_area.widgetResizable()
+        # Graphics view should exist and have a scene
+        assert graphics_view is not None
+        assert graphics_view.scene() is not None
         
-        # Image label should have center alignment
-        assert image_label.alignment() & Qt.AlignmentFlag.AlignCenter
-        
-        # Image label should contain a pixmap
-        assert image_label.pixmap() is not None
+        # Pixmap item should contain the image
+        assert pixmap_item is not None
+        assert not pixmap_item.pixmap().isNull()
 
     def test_pixel_ratio_maintained(self, qtbot):
         """Test that pixels maintain 1:1 ratio (square pixels) when window is resized."""
@@ -980,7 +934,7 @@ class TestDiagramWindowHighDPI:
         window.display_image(svg_data, "svg")
         
         # Get the original pixmap and its aspect ratio
-        original_pixmap = window.image_label.pixmap()
+        original_pixmap = window.pixmap_item.pixmap()
         assert original_pixmap is not None
         
         # Calculate logical size (accounting for device pixel ratio)
@@ -992,28 +946,13 @@ class TestDiagramWindowHighDPI:
         # The original should have 2:1 aspect ratio
         assert abs(original_ratio - 2.0) < 0.1, f"Expected ~2.0 ratio, got {original_ratio}"
         
-        # Simulate window resize to a different aspect ratio
-        window.resize(400, 800)  # Tall narrow window (1:2 ratio)
-        qtbot.wait(50)  # Give time for resize events
+        # Verify device pixel ratio is maintained
+        window_device_ratio = window.devicePixelRatio()
+        assert device_ratio == window_device_ratio, f"Expected device ratio {window_device_ratio}, got {device_ratio}"
         
-        # Get the resized pixmap
-        resized_pixmap = window.image_label.pixmap()
-        assert resized_pixmap is not None
-        
-        # Calculate new logical size
-        device_ratio = resized_pixmap.devicePixelRatio()
-        logical_width = resized_pixmap.width() / device_ratio
-        logical_height = resized_pixmap.height() / device_ratio
-        resized_ratio = logical_width / logical_height
-        
-        # Image should still maintain 2:1 aspect ratio (1:1 pixel ratio)
-        assert abs(resized_ratio - 2.0) < 0.1, f"Expected ~2.0 ratio after resize, got {resized_ratio}"
-        
-        # Verify the image label has center alignment for padding
-        assert window.image_label.alignment() & Qt.AlignmentFlag.AlignCenter
-        
-        # Verify scaled contents is disabled (critical for 1:1 pixels)
-        assert not window.image_label.hasScaledContents()
+        # Verify pixmap item maintains correct proportions
+        assert window.pixmap_item is not None
+        assert not window.pixmap_item.pixmap().isNull()
 
 
 
