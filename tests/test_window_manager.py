@@ -745,8 +745,8 @@ class TestDiagramWindowToolbar:
             qtbot.wait(10)
             mock_toggle_format.assert_called_once()
             
-            # Test A key (toggle always on top)
-            QTest.keyClick(window, Qt.Key.Key_A)
+            # Test Cmd+T (toggle always on top)
+            QTest.keyClick(window, Qt.Key.Key_T, Qt.KeyboardModifier.ControlModifier)
             qtbot.wait(10)
             mock_toggle_always_on_top.assert_called_once()
             

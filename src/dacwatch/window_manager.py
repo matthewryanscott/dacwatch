@@ -487,8 +487,8 @@ class DiagramWindow(QMainWindow):
         toggle_format_shortcut = QShortcut(QKeySequence("F"), self)
         toggle_format_shortcut.activated.connect(self.toggle_format)
         
-        # Toggle always on top (A key)
-        toggle_always_on_top_shortcut = QShortcut(QKeySequence("A"), self)
+        # Toggle always on top (Cmd+T)
+        toggle_always_on_top_shortcut = QShortcut(QKeySequence("Ctrl+T"), self)
         toggle_always_on_top_shortcut.activated.connect(self.toggle_always_on_top)
         
         # Reveal in Finder (Cmd+R on Mac, Ctrl+R on others)
