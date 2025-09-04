@@ -723,7 +723,7 @@ class TestDiagramWindowToolbar:
         with patch.object(window, 'copy_image_to_clipboard') as mock_copy_image, \
              patch.object(window, 'copy_source_to_clipboard') as mock_copy_source, \
              patch.object(window, 'toggle_format') as mock_toggle_format, \
-             patch.object(window, 'toggle_always_on_top') as mock_toggle_always_on_top, \
+             patch.object(window.always_on_top_action, 'trigger') as mock_toggle_always_on_top, \
              patch.object(window, 'reveal_in_finder') as mock_reveal_finder:
             
             # Give focus to the window
@@ -740,8 +740,8 @@ class TestDiagramWindowToolbar:
             qtbot.wait(10)
             mock_copy_source.assert_called_once()
             
-            # Test F key (toggle format)
-            QTest.keyClick(window, Qt.Key.Key_F)
+            # Test Cmd+F (toggle format)
+            QTest.keyClick(window, Qt.Key.Key_F, Qt.KeyboardModifier.ControlModifier)
             qtbot.wait(10)
             mock_toggle_format.assert_called_once()
             
@@ -807,6 +807,36 @@ class TestDiagramWindowToolbar:
         finally:
             # Clean up temp file
             os.unlink(temp_file)
+
+    def test_toggle_always_on_top_keyboard_shortcut(self, qtbot):
+        """Test that Cmd+T properly toggles always on top state."""
+        from dacwatch.window_manager import DiagramWindow
+        from PySide6.QtCore import Qt
+        
+        # Create a real window
+        window = DiagramWindow("test.svg")
+        qtbot.addWidget(window)
+        
+        # Initially should be always on top (default state)
+        initial_flags = window.windowFlags()
+        assert bool(initial_flags & Qt.WindowType.WindowStaysOnTopHint)  # Should be on top by default
+        assert window.always_on_top_action.isChecked()  # Action should be checked
+        
+        # Toggle off with keyboard shortcut (trigger action)
+        window.always_on_top_action.trigger()
+        
+        # Should now be off
+        new_flags = window.windowFlags()
+        assert not bool(new_flags & Qt.WindowType.WindowStaysOnTopHint)  # Should not be on top
+        assert not window.always_on_top_action.isChecked()  # Action should be unchecked
+        
+        # Toggle back on with keyboard shortcut (trigger action again)
+        window.always_on_top_action.trigger()
+        
+        # Should be back on
+        final_flags = window.windowFlags()
+        assert bool(final_flags & Qt.WindowType.WindowStaysOnTopHint)  # Should be on top again
+        assert window.always_on_top_action.isChecked()  # Action should be checked again
 
     def test_copy_source_to_clipboard(self):
         """Test copying source code to clipboard."""

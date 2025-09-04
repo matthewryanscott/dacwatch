@@ -6,7 +6,7 @@ import os
 # PySide imports
 from PySide6.QtWidgets import QMainWindow, QLabel, QVBoxLayout, QWidget, QGraphicsView, QGraphicsScene, QGraphicsPixmapItem
 from PySide6.QtCore import Qt, QEvent, QTimer, QPropertyAnimation, QEasingCurve
-from PySide6.QtGui import QPainter
+from PySide6.QtGui import QPainter, QAction
 
 
 class ToastWidget(QLabel):
@@ -177,6 +177,9 @@ class DiagramWindow(QMainWindow):
         self.loading_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self.loading_label)
 
+        # Setup actions first (needed by toolbar)
+        self._setup_actions()
+        
         # Setup toolbar
         self._setup_toolbar()
         
@@ -185,9 +188,6 @@ class DiagramWindow(QMainWindow):
         
         # Setup toast notification
         self.toast = ToastWidget(self)
-        
-        # Connect checkbox signal after method is defined
-        self.always_on_top_checkbox.toggled.connect(self.toggle_always_on_top)
 
     def display_image(self, image_data: bytes, format: str):
         """
@@ -485,10 +485,8 @@ class DiagramWindow(QMainWindow):
         self.copy_error_button.setStyleSheet("QPushButton:disabled { color: gray; }")
         toolbar.addWidget(self.copy_error_button)
 
-        # Always on top checkbox
-        self.always_on_top_checkbox = QCheckBox("Always on top")
-        self.always_on_top_checkbox.setChecked(True)  # Default to on
-        toolbar.addWidget(self.always_on_top_checkbox)
+        # Always on top toggle - using action for cleaner state management
+        toolbar.addAction(self.always_on_top_action)
 
         # Create format label for toolbar
         from PySide6.QtWidgets import QLabel
@@ -499,6 +497,26 @@ class DiagramWindow(QMainWindow):
         # Store current format and image data
         self.current_format = "svg"  # Default to SVG
         self.image_data = None
+
+    def _setup_actions(self):
+        """Setup actions for toolbar and shortcuts."""
+        # Always on top action - checkable for clean state management
+        self.always_on_top_action = QAction("Always on top", self)
+        self.always_on_top_action.setCheckable(True)
+        self.always_on_top_action.setChecked(True)  # Default to on
+        self.always_on_top_action.triggered.connect(self._handle_always_on_top)
+
+    def _handle_always_on_top(self, checked: bool):
+        """Handle always on top toggle with clean state management."""
+        if checked:
+            # Add the always on top flag
+            self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
+        else:
+            # Remove the always on top flag
+            self.setWindowFlags(self.windowFlags() & ~Qt.WindowType.WindowStaysOnTopHint)
+        
+        # Show the window again (required when changing window flags)
+        self.show()
 
     def _setup_shortcuts(self):
         """Setup keyboard shortcuts."""
@@ -528,13 +546,13 @@ class DiagramWindow(QMainWindow):
         copy_source_shortcut = QShortcut(QKeySequence("Ctrl+Shift+C"), self)
         copy_source_shortcut.activated.connect(self.copy_source_to_clipboard)
         
-        # Toggle format (F key)
-        toggle_format_shortcut = QShortcut(QKeySequence("F"), self)
+        # Toggle format (Cmd+F)
+        toggle_format_shortcut = QShortcut(QKeySequence("Ctrl+F"), self)
         toggle_format_shortcut.activated.connect(self.toggle_format)
         
         # Toggle always on top (Cmd+T)
         toggle_always_on_top_shortcut = QShortcut(QKeySequence("Ctrl+T"), self)
-        toggle_always_on_top_shortcut.activated.connect(self.toggle_always_on_top)
+        toggle_always_on_top_shortcut.activated.connect(lambda: self.always_on_top_action.trigger())
         
         # Reveal in Finder (Cmd+R on Mac, Ctrl+R on others)
         reveal_finder_shortcut = QShortcut(QKeySequence("Ctrl+R"), self)
@@ -611,17 +629,7 @@ class DiagramWindow(QMainWindow):
             # If subprocess fails, just continue
             pass
 
-    def toggle_always_on_top(self, checked: bool):
-        """Toggle the always on top window flag."""
-        if checked:
-            # Add the always on top flag
-            self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
-        else:
-            # Remove the always on top flag
-            self.setWindowFlags(self.windowFlags() & ~Qt.WindowType.WindowStaysOnTopHint)
-        
-        # Show the window again (required when changing window flags)
-        self.show()
+
 
     def zoom_in(self):
         """Zoom in on the image."""
