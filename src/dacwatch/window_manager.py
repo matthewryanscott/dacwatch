@@ -4,8 +4,86 @@ import json
 import os
 
 # PySide imports
-from PySide6.QtWidgets import QMainWindow, QLabel, QVBoxLayout, QWidget
-from PySide6.QtCore import Qt
+from PySide6.QtWidgets import QMainWindow, QLabel, QVBoxLayout, QWidget, QGraphicsView, QGraphicsScene, QGraphicsPixmapItem
+from PySide6.QtCore import Qt, QEvent
+from PySide6.QtGui import QPainter
+
+
+class ZoomableGraphicsView(QGraphicsView):
+    """A QGraphicsView with zoom and pan capabilities via mouse wheel and gestures."""
+
+    def __init__(self):
+        super().__init__()
+        self.setDragMode(QGraphicsView.DragMode.RubberBandDrag)
+        self.setRenderHint(QPainter.RenderHint.Antialiasing)
+        self.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+        self.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
+        self.setResizeAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
+        
+        # Enable gesture support for pinch-to-zoom
+        self.grabGesture(Qt.GestureType.PinchGesture)
+        
+        # Zoom limits
+        self.min_zoom = 0.1
+        self.max_zoom = 10.0
+        self.zoom_factor_base = 1.0015
+
+    def wheelEvent(self, event):
+        """Handle mouse wheel zoom."""
+        # Calculate zoom factor
+        angle = event.angleDelta().y()
+        factor = pow(self.zoom_factor_base, angle)
+        
+        # Apply zoom with limits
+        current_scale = self.transform().m11()
+        if (current_scale * factor < self.min_zoom and factor < 1) or \
+           (current_scale * factor > self.max_zoom and factor > 1):
+            return
+            
+        self.scale(factor, factor)
+
+    def event(self, event):
+        """Handle gesture events for pinch-to-zoom."""
+        if event.type() == QEvent.Type.Gesture:
+            return self.gestureEvent(event)
+        return super().event(event)
+
+    def gestureEvent(self, event):
+        """Handle pinch gesture for touch zoom."""
+        gesture = event.gesture(Qt.GestureType.PinchGesture)
+        if gesture:
+            if gesture.state() == Qt.GestureState.GestureUpdated:
+                # Get scale factor from pinch gesture
+                scale_factor = gesture.scaleFactor()
+                
+                # Apply zoom with limits
+                current_scale = self.transform().m11()
+                if (current_scale * scale_factor < self.min_zoom and scale_factor < 1) or \
+                   (current_scale * scale_factor > self.max_zoom and scale_factor > 1):
+                    return True
+                
+                self.scale(scale_factor, scale_factor)
+            return True
+        return False
+
+    def fit_in_view_with_margin(self, rect, margin_percent=10):
+        """Fit the given rect in view with a margin."""
+        if rect.isNull():
+            return
+            
+        # Add margin to the rect
+        margin_x = rect.width() * (margin_percent / 100.0)
+        margin_y = rect.height() * (margin_percent / 100.0)
+        expanded_rect = rect.adjusted(-margin_x, -margin_y, margin_x, margin_y)
+        
+        self.fitInView(expanded_rect, Qt.AspectRatioMode.KeepAspectRatio)
+
+    def reset_zoom(self):
+        """Reset zoom to fit the scene contents."""
+        if self.scene():
+            self.fit_in_view_with_margin(self.scene().itemsBoundingRect())
 
 
 class DiagramWindow(QMainWindow):
@@ -66,16 +144,11 @@ class DiagramWindow(QMainWindow):
         if format not in ["svg", "png"]:
             raise ValueError("Format must be 'svg' or 'png'")
 
-        from PySide6.QtWidgets import QLabel, QScrollArea
         from PySide6.QtGui import QPixmap, QPainter
         from PySide6.QtCore import QByteArray, QSize
         from PySide6.QtSvg import QSvgRenderer
 
         # Window will automatically stay on top due to WindowStaysOnTopHint
-
-        # Create image label
-        image_label = QLabel()
-        image_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
 
         # Get device pixel ratio for high-DPI displays
         device_pixel_ratio = self.devicePixelRatio()
@@ -113,25 +186,29 @@ class DiagramWindow(QMainWindow):
             pixmap.loadFromData(image_data)
             pixmap.setDevicePixelRatio(device_pixel_ratio)
         
-        # Set pixmap on label
-        image_label.setPixmap(pixmap)
+        # Create graphics view and scene for zoomable display
+        graphics_view = ZoomableGraphicsView()
+        graphics_scene = QGraphicsScene()
         
-        # Create scroll area to contain the image
-        scroll_area = QScrollArea()
-        scroll_area.setWidget(image_label)
-        scroll_area.setWidgetResizable(True)
-        scroll_area.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        # Create pixmap item and add to scene
+        pixmap_item = QGraphicsPixmapItem(pixmap)
+        graphics_scene.addItem(pixmap_item)
         
-        # Set white background for the scroll area and image label
-        scroll_area.setStyleSheet("QScrollArea { background-color: white; }")
-        image_label.setStyleSheet("QLabel { background-color: white; }")
+        # Set scene on view
+        graphics_view.setScene(graphics_scene)
+        
+        # Set white background for the graphics view
+        graphics_view.setStyleSheet("QGraphicsView { background-color: white; }")
+        
+        # Fit image in view with margin
+        graphics_view.fit_in_view_with_margin(pixmap_item.boundingRect())
 
         # Update format label
         if self.format_label:
             self.format_label.setText(f"Format: {format.upper()}")
             self.format_label.show()
 
-        # Replace loading label or existing image with scroll area
+        # Replace loading label or existing image with graphics view
         central_widget = self.centralWidget()
         if central_widget:
             layout = central_widget.layout()
@@ -141,11 +218,11 @@ class DiagramWindow(QMainWindow):
                     layout.removeWidget(self.loading_label)
                     self.loading_label.hide()
                 
-                # Remove existing scroll area if present
-                if hasattr(self, 'scroll_area') and self.scroll_area is not None:
+                # Remove existing graphics view if present
+                if hasattr(self, 'graphics_view') and self.graphics_view is not None:
                     try:
-                        layout.removeWidget(self.scroll_area)
-                        self.scroll_area.deleteLater()
+                        layout.removeWidget(self.graphics_view)
+                        self.graphics_view.deleteLater()
                     except (RuntimeError, AttributeError):
                         pass
                 
@@ -158,12 +235,13 @@ class DiagramWindow(QMainWindow):
                     except (RuntimeError, AttributeError):
                         pass
                 
-                # Add new scroll area
-                layout.addWidget(scroll_area)
+                # Add new graphics view
+                layout.addWidget(graphics_view)
 
         # Store references
-        self.scroll_area = scroll_area
-        self.image_label = image_label
+        self.graphics_view = graphics_view
+        self.graphics_scene = graphics_scene
+        self.pixmap_item = pixmap_item
         
         # Disable Copy Error button when displaying successful images
         if hasattr(self, 'copy_error_button'):
@@ -268,11 +346,11 @@ class DiagramWindow(QMainWindow):
                     layout.removeWidget(self.loading_label)
                     self.loading_label.hide()
                 
-                # Remove existing scroll area if present
-                if hasattr(self, 'scroll_area') and self.scroll_area is not None:
+                # Remove existing graphics view if present (legacy scroll area support)
+                if hasattr(self, 'graphics_view') and self.graphics_view is not None:
                     try:
-                        layout.removeWidget(self.scroll_area)
-                        self.scroll_area.deleteLater()
+                        layout.removeWidget(self.graphics_view)
+                        self.graphics_view.deleteLater()
                     except (RuntimeError, AttributeError):
                         pass
                 
@@ -359,6 +437,17 @@ class DiagramWindow(QMainWindow):
         # Command-W (or Ctrl-W on non-Mac) to close window
         close_shortcut = QShortcut(QKeySequence.StandardKey.Close, self)
         close_shortcut.activated.connect(self.close)
+        
+        # Zoom shortcuts
+        zoom_in_shortcut = QShortcut(QKeySequence.StandardKey.ZoomIn, self)
+        zoom_in_shortcut.activated.connect(self.zoom_in)
+        
+        zoom_out_shortcut = QShortcut(QKeySequence.StandardKey.ZoomOut, self)
+        zoom_out_shortcut.activated.connect(self.zoom_out)
+        
+        # Reset zoom (Cmd+0 or Ctrl+0)
+        reset_zoom_shortcut = QShortcut(QKeySequence("Ctrl+0"), self)
+        reset_zoom_shortcut.activated.connect(self.reset_zoom)
 
     def toggle_format(self):
         """Toggle between SVG and PNG formats."""
@@ -375,20 +464,13 @@ class DiagramWindow(QMainWindow):
 
     def copy_image_to_clipboard(self):
         """Copy the current image to clipboard."""
-        if not hasattr(self, 'image_data') or self.image_data is None:
+        if not hasattr(self, 'pixmap_item') or self.pixmap_item is None:
             return
 
         from PySide6.QtWidgets import QApplication
-        from PySide6.QtGui import QPixmap, QImage
-        from PySide6.QtCore import QBuffer, QIODevice, QByteArray
 
-        # Create pixmap from current image data
-        pixmap = QPixmap()
-        if self.current_format == "svg":
-            byte_array = QByteArray(self.image_data)
-            pixmap.loadFromData(byte_array)
-        else:
-            pixmap.loadFromData(self.image_data)
+        # Get pixmap from the graphics item
+        pixmap = self.pixmap_item.pixmap()
 
         # Copy to clipboard
         clipboard = QApplication.clipboard()
@@ -434,6 +516,21 @@ class DiagramWindow(QMainWindow):
         
         # Show the window again (required when changing window flags)
         self.show()
+
+    def zoom_in(self):
+        """Zoom in on the image."""
+        if hasattr(self, 'graphics_view') and self.graphics_view:
+            self.graphics_view.scale(1.25, 1.25)
+
+    def zoom_out(self):
+        """Zoom out on the image."""
+        if hasattr(self, 'graphics_view') and self.graphics_view:
+            self.graphics_view.scale(0.8, 0.8)
+
+    def reset_zoom(self):
+        """Reset zoom to fit the image."""
+        if hasattr(self, 'graphics_view') and self.graphics_view:
+            self.graphics_view.reset_zoom()
 
 
 class WindowManager:

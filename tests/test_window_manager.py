@@ -380,25 +380,29 @@ class TestDiagramWindowImageDisplay:
 
     def test_display_image_svg_format(self, qtbot):
         """Test displaying SVG image data using real Qt widgets."""
-        from dacwatch.window_manager import DiagramWindow
-        from PySide6.QtWidgets import QLabel
-        
+        from dacwatch.window_manager import DiagramWindow, ZoomableGraphicsView
+        from PySide6.QtWidgets import QGraphicsScene
+
         # Create a real DiagramWindow
         window = DiagramWindow("/test/path.svg")
         qtbot.addWidget(window)
-        
+
         # Create minimal SVG data
         svg_data = b'<svg width="100" height="100"><circle cx="50" cy="50" r="40"/></svg>'
-        
+
         # Call display_image
         window.display_image(svg_data, "svg")
+
+        # Verify graphics view was created and is the main display widget
+        assert window.graphics_view is not None
+        assert isinstance(window.graphics_view, ZoomableGraphicsView)
         
-        # Verify image label was created and is the main display widget
-        assert window.image_label is not None
-        assert isinstance(window.image_label, QLabel)
+        # Verify graphics scene was created
+        assert window.graphics_scene is not None
+        assert isinstance(window.graphics_scene, QGraphicsScene)
         
-        # Verify the image label does NOT have scaled contents (maintains 1:1 pixel ratio)
-        assert not window.image_label.hasScaledContents()
+        # Verify pixmap item was created
+        assert window.pixmap_item is not None
         
         # Verify format label was updated
         assert window.format_label is not None
@@ -406,67 +410,64 @@ class TestDiagramWindowImageDisplay:
 
     def test_display_image_png_format(self, qtbot):
         """Test displaying PNG image data using real Qt widgets."""
-        from dacwatch.window_manager import DiagramWindow
-        from PySide6.QtWidgets import QLabel
-        
-        # Create a real DiagramWindow  
+        from dacwatch.window_manager import DiagramWindow, ZoomableGraphicsView
+
+        # Create a real DiagramWindow
         window = DiagramWindow("/test/path.png")
         qtbot.addWidget(window)
-        
+
         # Create minimal PNG data (this won't load as a real image, but we're testing the flow)
         png_data = b'\x89PNG\r\n\x1a\n' + b'x' * 100  # Minimal PNG header + data
-        
+
         # Call display_image
         window.display_image(png_data, "png")
-        
-        # Verify image label was created
-        assert window.image_label is not None
-        assert isinstance(window.image_label, QLabel)
+
+        # Verify graphics view was created
+        assert window.graphics_view is not None
+        assert isinstance(window.graphics_view, ZoomableGraphicsView)
         
         # Verify format label was updated
         assert window.format_label is not None
         assert window.format_label.text() == "Format: PNG"
 
     def test_display_image_replaces_loading_label(self, qtbot):
-        """Test that display_image replaces the loading label with image label."""
-        from dacwatch.window_manager import DiagramWindow
-        from PySide6.QtWidgets import QLabel
-        
+        """Test that display_image replaces the loading label with graphics view."""
+        from dacwatch.window_manager import DiagramWindow, ZoomableGraphicsView
+
         # Create a real DiagramWindow
         window = DiagramWindow("/test/path.svg")
         qtbot.addWidget(window)
-        
+
         # Verify loading label exists initially
         assert window.loading_label is not None
-        
+
         # Create minimal SVG data
         svg_data = b'<svg width="100" height="100"><circle cx="50" cy="50" r="40"/></svg>'
-        
+
         # Call display_image
         window.display_image(svg_data, "svg")
-        
+
         # Verify loading label is now hidden
         assert not window.loading_label.isVisible()
-        
-        # Verify image label was created and added
-        assert window.image_label is not None
-        assert isinstance(window.image_label, QLabel)
+
+        # Verify graphics view was created and added
+        assert window.graphics_view is not None
+        assert isinstance(window.graphics_view, ZoomableGraphicsView)
 
     def test_display_image_handles_empty_data(self, qtbot):
         """Test display_image handles empty image data gracefully."""
-        from dacwatch.window_manager import DiagramWindow
-        from PySide6.QtWidgets import QLabel
-        
+        from dacwatch.window_manager import DiagramWindow, ZoomableGraphicsView
+
         # Create a real DiagramWindow
         window = DiagramWindow("/test/path.svg")
         qtbot.addWidget(window)
-        
+
         # Call display_image with empty data
         window.display_image(b'', "svg")
-        
-        # Verify it doesn't crash and image label was created
-        assert window.image_label is not None
-        assert isinstance(window.image_label, QLabel)
+
+        # Verify it doesn't crash and graphics view was created
+        assert window.graphics_view is not None
+        assert isinstance(window.graphics_view, ZoomableGraphicsView)
         
         # Verify format label was updated
         assert window.format_label is not None
