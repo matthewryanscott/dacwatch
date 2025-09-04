@@ -108,8 +108,55 @@ class DaCWatchApp:
 
         except FileNotFoundError:
             print(f"File not found: {file_path}")
+            window.display_error("File not found", f"Could not read file: {file_path}", f"File not found: {file_path}")
         except Exception as e:
             print(f"Error rendering diagram: {e}")
+            # Parse error message for better user display
+            error_msg = str(e)
+            error_details = ""
+            
+            # Extract detailed error information if available
+            try:
+                if hasattr(e, 'message'):
+                    error_details = str(getattr(e, 'message', ''))
+                elif hasattr(e, 'args') and len(e.args) > 0:
+                    error_details = str(e.args[0])
+                else:
+                    error_details = error_msg
+            except:
+                error_details = error_msg
+            
+            # Extract raw error response body if available (for textarea)
+            error_body = ""
+            try:
+                if hasattr(e, 'body'):
+                    error_body = str(getattr(e, 'body', ''))
+                elif "Error details:" in error_details:
+                    # Extract just the response part
+                    parts = error_details.split("Error details:")
+                    if len(parts) > 1:
+                        error_body = parts[1].strip()
+                else:
+                    error_body = error_details
+            except:
+                error_body = error_msg
+            
+            if "400" in error_msg or "Bad Request" in error_msg:
+                # Extract syntax error details from Kroki response
+                main_msg = "Diagram syntax error"
+                details = "The diagram contains invalid syntax. Please check your diagram code for errors."
+                window.display_error(main_msg, details, error_body)
+                
+            elif "500" in error_msg:
+                window.display_error("Server error", 
+                    "The Kroki service encountered an error. Please try again later.", error_body)
+                    
+            elif "timeout" in error_msg.lower() or "connection" in error_msg.lower():
+                kroki_url = self.config.kroki_base if hasattr(self.config, 'kroki_base') else "Kroki service"
+                window.display_error("Network error", 
+                    f"Could not connect to Kroki service: {kroki_url}", error_body)
+            else:
+                window.display_error("Rendering error", "Unexpected error occurred.", error_body)
 
 
 

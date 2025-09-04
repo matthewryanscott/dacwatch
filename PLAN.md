@@ -59,12 +59,12 @@
 - [x] **Manual Validation**: Interactive testing of all user actions
 
 ## Phase 7: Advanced Features (TDD)
-- [ ] **Auto-refresh**: Test file change detection and re-rendering, then implement
+- [x] **Auto-refresh**: Test file change detection and re-rendering, then implement
 - [ ] **Error Display**: Test error message handling, then implement
 - [ ] **Preferences**: Test settings persistence, then implement
 - [ ] **Multiple Kroki Services**: Test endpoint switching, then implement
 - [ ] **File Validation**: Test syntax checking, then implement
-- [ ] **Manual Validation**: End-to-end testing of advanced workflows
+- [x] **Manual Validation**: End-to-end testing of advanced workflows
 
 ## Phase 8: Testing & Polish
 - [ ] **Unit Tests**: Test file watcher, Kroki client, window management

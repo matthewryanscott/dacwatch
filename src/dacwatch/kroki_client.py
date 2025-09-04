@@ -63,5 +63,18 @@ class KrokiClient:
 
         async with aiohttp.ClientSession() as session:
             async with session.post(url, data=source.encode('utf-8')) as response:
-                response.raise_for_status()
+                if response.status >= 400:
+                    # Get raw error response body for textarea display
+                    error_body = await response.text()
+                    
+                    # Create a custom exception that includes the raw response body
+                    class KrokiError(Exception):
+                        def __init__(self, status, reason, body):
+                            self.status = status
+                            self.reason = reason
+                            self.body = body
+                            super().__init__(f"{status}, message='{reason}', url='{url}'")
+                    
+                    raise KrokiError(response.status, response.reason, error_body)
+                
                 return await response.read()

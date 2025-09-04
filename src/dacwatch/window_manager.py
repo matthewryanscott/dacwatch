@@ -141,6 +141,15 @@ class DiagramWindow(QMainWindow):
                     except (RuntimeError, AttributeError):
                         pass
                 
+                # Remove existing error widget if present
+                if hasattr(self, 'error_widget') and self.error_widget is not None:
+                    try:
+                        layout.removeWidget(self.error_widget)
+                        self.error_widget.deleteLater()
+                        self.error_widget = None
+                    except (RuntimeError, AttributeError):
+                        pass
+                
                 # Add new scroll area
                 layout.addWidget(scroll_area)
 
@@ -148,9 +157,138 @@ class DiagramWindow(QMainWindow):
         self.scroll_area = scroll_area
         self.image_label = image_label
         
+        # Disable Copy Error button when displaying successful images
+        if hasattr(self, 'copy_error_button'):
+            self.copy_error_button.setEnabled(False)
+            self.copy_error_button.setStyleSheet("QPushButton:disabled { color: gray; }")
+        
+        # Clear any stored error text
+        if hasattr(self, 'full_error_text'):
+            self.full_error_text = ""
+        
         # Store image data for format toggling
         self.image_data = image_data
         self.current_format = format
+
+    def display_error(self, error_message: str, error_details: str = "", full_error: str = ""):
+        """
+        Display an error message in the window with full error details in a textarea.
+
+        Args:
+            error_message: Main error message to display
+            error_details: Optional detailed error information for display
+            full_error: Complete error response for copy/paste functionality
+        """
+        from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget, QTextEdit
+        from PySide6.QtCore import Qt
+
+        # Store full error text for clipboard copy (just the raw error body)
+        self.full_error_text = full_error.strip() if full_error else error_message
+
+        # Create error display widget
+        error_widget = QWidget()
+        error_layout = QVBoxLayout(error_widget)
+        error_layout.setAlignment(Qt.AlignmentFlag.AlignTop)
+
+        # Main error message
+        error_label = QLabel(f"❌ Error: {error_message}")
+        error_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        error_label.setStyleSheet("""
+            QLabel {
+                color: #d32f2f;
+                font-size: 16px;
+                font-weight: bold;
+                padding: 20px;
+                background-color: #ffebee;
+                border: 2px solid #ffcdd2;
+                border-radius: 8px;
+                margin: 10px;
+            }
+        """)
+        error_layout.addWidget(error_label)
+
+        # Brief description if provided
+        if error_details:
+            details_label = QLabel(error_details)
+            details_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+            details_label.setStyleSheet("""
+                QLabel {
+                    color: #666;
+                    font-size: 12px;
+                    padding: 10px;
+                    background-color: #f5f5f5;
+                    border-radius: 4px;
+                    margin: 5px 20px;
+                }
+            """)
+            details_label.setWordWrap(True)
+            error_layout.addWidget(details_label)
+
+        # Error response body in a copyable textarea (only if we have content)
+        if self.full_error_text and self.full_error_text != error_message:
+            error_text_label = QLabel("Error Response:")
+            error_text_label.setStyleSheet("QLabel { font-weight: bold; margin: 10px 20px 5px 20px; }")
+            error_layout.addWidget(error_text_label)
+
+            error_textarea = QTextEdit()
+            error_textarea.setPlainText(self.full_error_text)
+            error_textarea.setReadOnly(True)
+            error_textarea.setMaximumHeight(200)
+            error_textarea.setStyleSheet("""
+                QTextEdit {
+                    font-family: monospace;
+                    font-size: 11px;
+                    border: 1px solid gray;
+                    border-radius: 4px;
+                    margin: 5px 20px;
+                    padding: 10px;
+                }
+            """)
+            error_layout.addWidget(error_textarea)
+
+        # NO white background for error widget - use default system background
+
+        # Replace loading label or existing content with error widget
+        central_widget = self.centralWidget()
+        if central_widget:
+            layout = central_widget.layout()
+            if layout:
+                # Remove loading label if visible
+                if self.loading_label and self.loading_label.isVisible():
+                    layout.removeWidget(self.loading_label)
+                    self.loading_label.hide()
+                
+                # Remove existing scroll area if present
+                if hasattr(self, 'scroll_area') and self.scroll_area is not None:
+                    try:
+                        layout.removeWidget(self.scroll_area)
+                        self.scroll_area.deleteLater()
+                    except (RuntimeError, AttributeError):
+                        pass
+                
+                # Remove existing error widget if present (to prevent stacking)
+                if hasattr(self, 'error_widget') and self.error_widget is not None:
+                    try:
+                        layout.removeWidget(self.error_widget)
+                        self.error_widget.deleteLater()
+                    except (RuntimeError, AttributeError):
+                        pass
+                
+                # Add new error widget
+                layout.addWidget(error_widget)
+
+        # Store error widget reference for cleanup
+        self.error_widget = error_widget
+        
+        # Enable Copy Error button
+        if hasattr(self, 'copy_error_button'):
+            self.copy_error_button.setEnabled(True)
+            self.copy_error_button.setStyleSheet("QPushButton { color: black; }")
+        
+        # Update format label to show error state
+        if self.format_label:
+            self.format_label.setText("Error")
+            self.format_label.show()
 
     def _setup_toolbar(self):
         """Setup the toolbar with action buttons."""
@@ -180,6 +318,13 @@ class DiagramWindow(QMainWindow):
         self.reveal_button = QPushButton("Reveal in Finder")
         self.reveal_button.clicked.connect(self.reveal_in_finder)
         toolbar.addWidget(self.reveal_button)
+
+        # Copy Error button (initially disabled)
+        self.copy_error_button = QPushButton("Copy Error")
+        self.copy_error_button.clicked.connect(self.copy_error_to_clipboard)
+        self.copy_error_button.setEnabled(False)  # Disabled until there's an error
+        self.copy_error_button.setStyleSheet("QPushButton:disabled { color: gray; }")
+        toolbar.addWidget(self.copy_error_button)
 
         # Create format label for toolbar
         from PySide6.QtWidgets import QLabel
@@ -246,6 +391,13 @@ class DiagramWindow(QMainWindow):
         except (IOError, OSError):
             # If we can't read the file, just continue
             pass
+
+    def copy_error_to_clipboard(self):
+        """Copy the full error response to clipboard."""
+        if hasattr(self, 'full_error_text') and self.full_error_text:
+            from PySide6.QtWidgets import QApplication
+            clipboard = QApplication.clipboard()
+            clipboard.setText(self.full_error_text)
 
     def reveal_in_finder(self):
         """Reveal the file in Finder (macOS)."""
