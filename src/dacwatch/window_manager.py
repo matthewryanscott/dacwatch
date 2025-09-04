@@ -474,6 +474,26 @@ class DiagramWindow(QMainWindow):
         # Reset zoom (Cmd+0 or Ctrl+0)
         reset_zoom_shortcut = QShortcut(QKeySequence("Ctrl+0"), self)
         reset_zoom_shortcut.activated.connect(self.reset_zoom)
+        
+        # Copy image (Cmd+C)
+        copy_image_shortcut = QShortcut(QKeySequence.StandardKey.Copy, self)
+        copy_image_shortcut.activated.connect(self.copy_image_to_clipboard)
+        
+        # Copy source (Cmd+Shift+C)
+        copy_source_shortcut = QShortcut(QKeySequence("Ctrl+Shift+C"), self)
+        copy_source_shortcut.activated.connect(self.copy_source_to_clipboard)
+        
+        # Toggle format (F key)
+        toggle_format_shortcut = QShortcut(QKeySequence("F"), self)
+        toggle_format_shortcut.activated.connect(self.toggle_format)
+        
+        # Toggle always on top (A key)
+        toggle_always_on_top_shortcut = QShortcut(QKeySequence("A"), self)
+        toggle_always_on_top_shortcut.activated.connect(self.toggle_always_on_top)
+        
+        # Reveal in Finder (Cmd+R on Mac, Ctrl+R on others)
+        reveal_finder_shortcut = QShortcut(QKeySequence("Ctrl+R"), self)
+        reveal_finder_shortcut.activated.connect(self.reveal_in_finder)
 
     def toggle_format(self):
         """Toggle between SVG and PNG formats."""

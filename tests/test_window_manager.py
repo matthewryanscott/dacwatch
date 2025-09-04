@@ -707,6 +707,54 @@ class TestDiagramWindowToolbar:
         # clipboard_image.save("/tmp/clipboard_test.png", "PNG")
         # print("Saved clipboard image to /tmp/clipboard_test.png for manual inspection")
 
+    def test_keyboard_shortcuts(self, qtbot):
+        """Test keyboard shortcuts functionality."""
+        from dacwatch.window_manager import DiagramWindow
+        from unittest.mock import patch, Mock
+        from PySide6.QtCore import Qt
+        from PySide6.QtGui import QKeySequence
+        from PySide6.QtTest import QTest
+        
+        # Create a real window
+        window = DiagramWindow("test.svg")
+        qtbot.addWidget(window)
+        
+        # Mock the methods to verify they're called
+        with patch.object(window, 'copy_image_to_clipboard') as mock_copy_image, \
+             patch.object(window, 'copy_source_to_clipboard') as mock_copy_source, \
+             patch.object(window, 'toggle_format') as mock_toggle_format, \
+             patch.object(window, 'toggle_always_on_top') as mock_toggle_always_on_top, \
+             patch.object(window, 'reveal_in_finder') as mock_reveal_finder:
+            
+            # Give focus to the window
+            window.show()
+            qtbot.waitForWindowShown(window)
+            
+            # Test Cmd+C (copy image) - on macOS this uses ControlModifier in Qt
+            QTest.keyClick(window, Qt.Key.Key_C, Qt.KeyboardModifier.ControlModifier)
+            qtbot.wait(10)  # Small wait for signal processing
+            mock_copy_image.assert_called_once()
+            
+            # Test Cmd+Shift+C (copy source)  
+            QTest.keyClick(window, Qt.Key.Key_C, Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier)
+            qtbot.wait(10)
+            mock_copy_source.assert_called_once()
+            
+            # Test F key (toggle format)
+            QTest.keyClick(window, Qt.Key.Key_F)
+            qtbot.wait(10)
+            mock_toggle_format.assert_called_once()
+            
+            # Test A key (toggle always on top)
+            QTest.keyClick(window, Qt.Key.Key_A)
+            qtbot.wait(10)
+            mock_toggle_always_on_top.assert_called_once()
+            
+            # Test Cmd+R (reveal in finder)
+            QTest.keyClick(window, Qt.Key.Key_R, Qt.KeyboardModifier.ControlModifier)
+            qtbot.wait(10)
+            mock_reveal_finder.assert_called_once()
+
     def test_copy_source_to_clipboard(self):
         """Test copying source code to clipboard."""
         from unittest.mock import patch, Mock
