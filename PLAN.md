@@ -45,15 +45,18 @@
 - [x] **Image Display**: Test image loading logic, then implement
 - [x] **Toolbar/Menu**: Test button creation/signals, then implement
 - [x] **Auto-scaling**: Test scaling calculations, then implement
-- [ ] **Manual Validation**: Visual testing of GUI components and interactions
+- [x] **High-DPI Support**: High-DPI rendering with device pixel ratio support
+- [x] **QScrollArea Display**: Scrollable image viewer with white background
+- [x] **Keyboard Shortcuts**: Command-W to close windows
+- [x] **Manual Validation**: Visual testing of GUI components and interactions
 
 ## Phase 6: User Interactions (Limited TDD)
-- [ ] **Format Toggle**: Test format switching logic, then implement
-- [ ] **Copy Image**: Test clipboard operations (mock), then implement
-- [ ] **Copy Source**: Test source code copying, then implement
-- [ ] **Reveal in Finder**: Test subprocess calls, then implement
-- [ ] **Window Controls**: Test event handling, then implement
-- [ ] **Manual Validation**: Interactive testing of all user actions
+- [x] **Format Toggle**: Test format switching logic, then implement
+- [x] **Copy Image**: Test clipboard operations with high-DPI metadata, then implement
+- [x] **Copy Source**: Test source code copying, then implement
+- [x] **Reveal in Finder**: Test subprocess calls, then implement
+- [x] **Window Controls**: Test event handling, then implement
+- [x] **Manual Validation**: Interactive testing of all user actions
 
 ## Phase 7: Advanced Features (TDD)
 - [ ] **Auto-refresh**: Test file change detection and re-rendering, then implement
