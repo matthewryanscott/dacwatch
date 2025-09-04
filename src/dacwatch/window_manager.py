@@ -25,6 +25,9 @@ class DiagramWindow(QMainWindow):
         file_name = Path(self.file_path).name
         self.setWindowTitle(f"DaCWatch - {file_name}")
 
+        # Set window flags to stay on top without stealing focus
+        self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
+
         # Set window geometry (position and size)
         self.setGeometry(100, 100, 800, 600)
 
@@ -45,6 +48,9 @@ class DiagramWindow(QMainWindow):
         
         # Setup keyboard shortcuts
         self._setup_shortcuts()
+        
+        # Connect checkbox signal after method is defined
+        self.always_on_top_checkbox.toggled.connect(self.toggle_always_on_top)
 
     def display_image(self, image_data: bytes, format: str):
         """
@@ -64,6 +70,8 @@ class DiagramWindow(QMainWindow):
         from PySide6.QtGui import QPixmap, QPainter
         from PySide6.QtCore import QByteArray, QSize
         from PySide6.QtSvg import QSvgRenderer
+
+        # Window will automatically stay on top due to WindowStaysOnTopHint
 
         # Create image label
         image_label = QLabel()
@@ -182,6 +190,8 @@ class DiagramWindow(QMainWindow):
         from PySide6.QtWidgets import QLabel, QVBoxLayout, QWidget, QTextEdit
         from PySide6.QtCore import Qt
 
+        # Window will automatically stay on top due to WindowStaysOnTopHint
+
         # Store full error text for clipboard copy (just the raw error body)
         self.full_error_text = full_error.strip() if full_error else error_message
 
@@ -292,7 +302,7 @@ class DiagramWindow(QMainWindow):
 
     def _setup_toolbar(self):
         """Setup the toolbar with action buttons."""
-        from PySide6.QtWidgets import QToolBar, QPushButton
+        from PySide6.QtWidgets import QToolBar, QPushButton, QCheckBox
         from PySide6.QtCore import Qt
 
         # Create toolbar
@@ -325,6 +335,11 @@ class DiagramWindow(QMainWindow):
         self.copy_error_button.setEnabled(False)  # Disabled until there's an error
         self.copy_error_button.setStyleSheet("QPushButton:disabled { color: gray; }")
         toolbar.addWidget(self.copy_error_button)
+
+        # Always on top checkbox
+        self.always_on_top_checkbox = QCheckBox("Always on top")
+        self.always_on_top_checkbox.setChecked(True)  # Default to on
+        toolbar.addWidget(self.always_on_top_checkbox)
 
         # Create format label for toolbar
         from PySide6.QtWidgets import QLabel
@@ -408,6 +423,18 @@ class DiagramWindow(QMainWindow):
             # If subprocess fails, just continue
             pass
 
+    def toggle_always_on_top(self, checked: bool):
+        """Toggle the always on top window flag."""
+        if checked:
+            # Add the always on top flag
+            self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
+        else:
+            # Remove the always on top flag
+            self.setWindowFlags(self.windowFlags() & ~Qt.WindowType.WindowStaysOnTopHint)
+        
+        # Show the window again (required when changing window flags)
+        self.show()
+
 
 class WindowManager:
     """Manages the mapping between files and their corresponding windows."""
@@ -483,6 +510,7 @@ class WindowManager:
         window = self.get_window_for_file(file_path)
         if window is None:
             window = self.create_window(file_path)
+        # Window will automatically stay on top due to WindowStaysOnTopHint
         return window
 
     def list_open_files(self) -> List[str]:
