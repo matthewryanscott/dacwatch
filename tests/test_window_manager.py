@@ -909,6 +909,53 @@ class TestDiagramWindowToolbar:
         # Verify the shortcut is enabled
         assert ctrl_equal_shortcuts[0].isEnabled(), "Ctrl+= shortcut should be enabled"
 
+    def test_zoom_label_creation_and_updates(self, qtbot):
+        """Test that zoom label is created and updates correctly."""
+        from dacwatch.window_manager import DiagramWindow
+        from PySide6.QtWidgets import QLabel, QToolBar
+        
+        # Create a real window
+        window = DiagramWindow("test.svg")
+        qtbot.addWidget(window)
+        
+        # Create test SVG content and display it
+        svg_content = '''<svg width="200" height="200" xmlns="http://www.w3.org/2000/svg">
+            <rect x="50" y="50" width="100" height="100" fill="green"/>
+        </svg>'''
+        window.display_image(svg_content.encode(), "svg")
+        
+        # Check that toolbars exist
+        toolbars = window.findChildren(QToolBar)
+        assert len(toolbars) >= 1
+        
+        toolbar = toolbars[0]
+        
+        # Check that zoom label exists
+        assert hasattr(window, 'zoom_label')
+        assert window.zoom_label is not None
+        assert isinstance(window.zoom_label, QLabel)
+        
+        # Check that zoom label is in the toolbar
+        labels_in_toolbar = toolbar.findChildren(QLabel)
+        assert window.zoom_label in labels_in_toolbar
+        
+        # Initially should show 100%
+        assert window.zoom_label.text() == "100%"
+        
+        # Test zoom in - should update label
+        window.zoom_in()
+        expected_zoom = int(1.25 * 100)  # 125%
+        assert window.zoom_label.text() == f"{expected_zoom}%"
+        
+        # Test zoom out - should update label  
+        window.zoom_out()
+        expected_zoom = int(1.25 * 0.8 * 100)  # 100% (1.25 * 0.8 = 1.0)
+        assert window.zoom_label.text() == f"{expected_zoom}%"
+        
+        # Test reset zoom - should show 100%
+        window.reset_zoom()
+        assert window.zoom_label.text() == "100%"
+
     def test_copy_source_to_clipboard(self):
         """Test copying source code to clipboard."""
         from unittest.mock import patch, Mock

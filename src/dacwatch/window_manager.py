@@ -106,6 +106,9 @@ class ZoomableGraphicsView(QGraphicsView):
                 # Notify parent window of zoom change if available
                 if self.parent_window and hasattr(self.parent_window, 'current_zoom_scale'):
                     self.parent_window.current_zoom_scale = self.get_current_scale()
+                    # Update zoom label if available
+                    if hasattr(self.parent_window, '_update_zoom_label'):
+                        self.parent_window._update_zoom_label()
             return True
         return False
 
@@ -276,6 +279,9 @@ class DiagramWindow(QMainWindow):
             # Subsequent updates - reset transform first, then apply saved scale
             graphics_view.resetTransform()
             graphics_view.set_scale(self.current_zoom_scale)
+        
+        # Update zoom label
+        self._update_zoom_label()
 
         # Update format label
         if self.format_label:
@@ -508,10 +514,28 @@ class DiagramWindow(QMainWindow):
         self.format_label = QLabel("")
         self.format_label.setStyleSheet("color: gray; font-size: 12px; padding: 5px;")
         toolbar.addWidget(self.format_label)
+        
+        # Create zoom level label for toolbar
+        self.zoom_label = QLabel("100%")
+        self.zoom_label.setStyleSheet("color: gray; font-size: 12px; padding: 5px;")
+        toolbar.addWidget(self.zoom_label)
 
         # Store current format and image data
         self.current_format = "svg"  # Default to SVG
         self.image_data = None
+        
+        # Update initial zoom label
+        self._update_zoom_label()
+        
+        # Update initial zoom label
+        self._update_zoom_label()
+
+    def _update_zoom_label(self):
+        """Update the zoom label with current zoom percentage."""
+        if hasattr(self, 'zoom_label') and self.zoom_label:
+            # Convert zoom scale to percentage
+            zoom_percent = int(self.current_zoom_scale * 100)
+            self.zoom_label.setText(f"{zoom_percent}%")
 
     def _setup_actions(self):
         """Setup actions for toolbar and shortcuts."""
@@ -661,18 +685,21 @@ class DiagramWindow(QMainWindow):
         if hasattr(self, 'graphics_view') and self.graphics_view:
             self.graphics_view.scale(1.25, 1.25)
             self.current_zoom_scale = self.graphics_view.get_current_scale()
+            self._update_zoom_label()
 
     def zoom_out(self):
         """Zoom out on the image."""
         if hasattr(self, 'graphics_view') and self.graphics_view:
             self.graphics_view.scale(0.8, 0.8)
             self.current_zoom_scale = self.graphics_view.get_current_scale()
+            self._update_zoom_label()
 
     def reset_zoom(self):
         """Reset zoom to 1:1 pixel ratio (no scaling)."""
         if hasattr(self, 'graphics_view') and self.graphics_view:
             self.graphics_view.reset_zoom()
             self.current_zoom_scale = 1.0  # Reset to 1:1 pixel ratio
+            self._update_zoom_label()
 
     def showEvent(self, event):
         """Handle window show event to set focus to graphics view."""
