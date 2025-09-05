@@ -553,11 +553,11 @@ class TestDiagramWindowToolbar:
         buttons = toolbar.findChildren(QPushButton)
         copy_button = None
         for button in buttons:
-            if "Copy Image" in button.text():
+            if "📋 Image" in button.text():
                 copy_button = button
                 break
         
-        assert copy_button is not None, "Copy Image button should exist"
+        assert copy_button is not None, "📋 Image button should exist"
 
     def test_copy_source_button_creation(self, qtbot):
         """Test that copy source button is created and configured."""
@@ -578,11 +578,11 @@ class TestDiagramWindowToolbar:
         buttons = toolbar.findChildren(QPushButton)
         copy_source_button = None
         for button in buttons:
-            if "Copy Source" in button.text():
+            if "📋 Source" in button.text():
                 copy_source_button = button
                 break
         
-        assert copy_source_button is not None, "Copy Source button should exist"
+        assert copy_source_button is not None, "📋 Source button should exist"
 
     def test_reveal_finder_button_creation(self, qtbot):
         """Test that reveal in Finder button is created and configured."""
@@ -603,17 +603,39 @@ class TestDiagramWindowToolbar:
         buttons = toolbar.findChildren(QPushButton)
         reveal_button = None
         for button in buttons:
-            if "Reveal in Finder" in button.text():
+            if "Reveal" in button.text():
                 reveal_button = button
                 break
         
-        assert reveal_button is not None, "Reveal in Finder button should exist"
+        assert reveal_button is not None, "Reveal button should exist"
         
         # Verify we have all expected buttons (excluding the removed toggle button)
         button_texts = [button.text() for button in buttons]
-        expected_buttons = ["Copy Image", "Copy Source", "Reveal in Finder"]
+        expected_buttons = ["📋 Image", "📋 Source", "📋 Error", "Reveal"]
         for expected in expected_buttons:
             assert expected in button_texts, f"Button '{expected}' should exist"
+
+    def test_button_labels_with_emojis(self, qtbot):
+        """Test that button labels include the correct emojis and text."""
+        from dacwatch.window_manager import DiagramWindow
+        from PySide6.QtWidgets import QPushButton
+        
+        # Create a real DiagramWindow
+        window = DiagramWindow("/path/to/test/file.dot")
+        qtbot.addWidget(window)
+        
+        # Test specific button labels
+        assert hasattr(window, 'copy_image_button')
+        assert window.copy_image_button.text() == "📋 Image"
+        
+        assert hasattr(window, 'copy_source_button')
+        assert window.copy_source_button.text() == "📋 Source"
+        
+        assert hasattr(window, 'copy_error_button')
+        assert window.copy_error_button.text() == "📋 Error"
+        
+        assert hasattr(window, 'reveal_button')
+        assert window.reveal_button.text() == "Reveal"
 
     def test_format_radio_functionality(self, qtbot):
         """Test format radio button functionality."""

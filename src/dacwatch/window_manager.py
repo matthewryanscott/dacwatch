@@ -492,26 +492,26 @@ class DiagramWindow(QMainWindow):
         self.addToolBar(Qt.ToolBarArea.TopToolBarArea, toolbar)
 
         # Copy image button
-        self.copy_image_button = QPushButton("Copy Image")
+        self.copy_image_button = QPushButton("📋 Image")
         self.copy_image_button.clicked.connect(self.copy_image_to_clipboard)
         toolbar.addWidget(self.copy_image_button)
 
         # Copy source button
-        self.copy_source_button = QPushButton("Copy Source")
+        self.copy_source_button = QPushButton("📋 Source")
         self.copy_source_button.clicked.connect(self.copy_source_to_clipboard)
         toolbar.addWidget(self.copy_source_button)
 
-        # Reveal in Finder button
-        self.reveal_button = QPushButton("Reveal in Finder")
-        self.reveal_button.clicked.connect(self.reveal_in_finder)
-        toolbar.addWidget(self.reveal_button)
-
         # Copy Error button (initially disabled)
-        self.copy_error_button = QPushButton("Copy Error")
+        self.copy_error_button = QPushButton("📋 Error")
         self.copy_error_button.clicked.connect(self.copy_error_to_clipboard)
         self.copy_error_button.setEnabled(False)  # Disabled until there's an error
         self.copy_error_button.setStyleSheet("QPushButton:disabled { color: gray; }")
         toolbar.addWidget(self.copy_error_button)
+
+        # Reveal in Finder button
+        self.reveal_button = QPushButton("Reveal")
+        self.reveal_button.clicked.connect(self.reveal_in_finder)
+        toolbar.addWidget(self.reveal_button)
 
         # Always on top toggle - using action for cleaner state management
         toolbar.addAction(self.always_on_top_action)
