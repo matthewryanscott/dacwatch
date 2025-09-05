@@ -65,6 +65,9 @@ class ZoomableGraphicsView(QGraphicsView):
         self.setTransformationAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
         self.setResizeAnchor(QGraphicsView.ViewportAnchor.AnchorUnderMouse)
         
+        # Enable keyboard focus so arrow keys can be used for navigation
+        self.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
+        
         # Enable gesture support for pinch-to-zoom
         self.grabGesture(Qt.GestureType.PinchGesture)
         
@@ -314,6 +317,18 @@ class DiagramWindow(QMainWindow):
         self.graphics_scene = graphics_scene
         self.pixmap_item = pixmap_item
         
+        # Set focus to the graphics view for keyboard navigation
+        # Use a small delay to ensure focus is set after all other UI updates complete
+        from PySide6.QtCore import QTimer
+        graphics_view.setFocus()
+        
+        # Set tab order to ensure graphics view is first in tab order
+        if hasattr(self, 'toggle_button') and self.toggle_button:
+            self.setTabOrder(graphics_view, self.toggle_button)
+        
+        # Use a delayed focus set to override any competing focus attempts
+        QTimer.singleShot(50, lambda: graphics_view.setFocus() if hasattr(self, 'graphics_view') and self.graphics_view else None)
+        
         # Disable Copy Error button when displaying successful images
         if hasattr(self, 'copy_error_button'):
             self.copy_error_button.setEnabled(False)
@@ -517,6 +532,12 @@ class DiagramWindow(QMainWindow):
         
         # Show the window again (required when changing window flags)
         self.show()
+        
+        # Set focus to graphics view if it exists
+        # Use a small delay to ensure focus is set after all other UI updates
+        if hasattr(self, 'graphics_view') and self.graphics_view:
+            from PySide6.QtCore import QTimer
+            QTimer.singleShot(50, lambda: self.graphics_view.setFocus() if hasattr(self, 'graphics_view') and self.graphics_view else None)
 
     def _setup_shortcuts(self):
         """Setup keyboard shortcuts."""
@@ -648,6 +669,24 @@ class DiagramWindow(QMainWindow):
         if hasattr(self, 'graphics_view') and self.graphics_view:
             self.graphics_view.reset_zoom()
             self.current_zoom_scale = 1.0  # Reset to 1:1 pixel ratio
+
+    def showEvent(self, event):
+        """Handle window show event to set focus to graphics view."""
+        super().showEvent(event)
+        # Set focus to graphics view for keyboard navigation
+        # Use a small delay to ensure focus is set after all other UI updates
+        if hasattr(self, 'graphics_view') and self.graphics_view:
+            from PySide6.QtCore import QTimer
+            QTimer.singleShot(50, lambda: self.graphics_view.setFocus() if hasattr(self, 'graphics_view') and self.graphics_view else None)
+
+    def focusInEvent(self, event):
+        """Handle window focus event to set focus to graphics view."""
+        super().focusInEvent(event)
+        # Set focus to graphics view for keyboard navigation
+        # Use a small delay to ensure focus is set after all other UI updates
+        if hasattr(self, 'graphics_view') and self.graphics_view:
+            from PySide6.QtCore import QTimer
+            QTimer.singleShot(50, lambda: self.graphics_view.setFocus() if hasattr(self, 'graphics_view') and self.graphics_view else None)
 
 
 class WindowManager:
