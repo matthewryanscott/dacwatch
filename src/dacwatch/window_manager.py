@@ -157,6 +157,7 @@ class DiagramWindow(QMainWindow):
         self.format_toggle_callback: Optional[Callable[[str], None]] = None
         self.current_zoom_scale: float = 1.0  # Store current zoom level
         self.is_first_display: bool = True  # Track if this is the first image display
+        self.should_auto_fit: bool = True  # Track if window should auto-fit on next image display
         self._setup_ui()
 
     def _setup_ui(self):
@@ -279,6 +280,18 @@ class DiagramWindow(QMainWindow):
             # Subsequent updates - reset transform first, then apply saved scale
             graphics_view.resetTransform()
             graphics_view.set_scale(self.current_zoom_scale)
+        
+        # Auto-fit window to diagram if this is the first display or after reappearing
+        if self.should_auto_fit and self.isVisible():
+            self.should_auto_fit = False
+            from PySide6.QtCore import QTimer
+            def auto_fit_after_display():
+                try:
+                    self.fit_to_diagram()
+                except (RuntimeError, AttributeError):
+                    pass
+            # Use a small delay to ensure the graphics view is fully set up
+            QTimer.singleShot(50, auto_fit_after_display)
         
         # Update zoom label
         self._update_zoom_label()
@@ -508,6 +521,11 @@ class DiagramWindow(QMainWindow):
         self.copy_error_button.setStyleSheet("QPushButton:disabled { color: gray; }")
         toolbar.addWidget(self.copy_error_button)
 
+        # Fit button to size window to diagram
+        self.fit_button = QPushButton("Fit")
+        self.fit_button.clicked.connect(self.fit_to_diagram)
+        toolbar.addWidget(self.fit_button)
+
         # Reveal in Finder button
         self.reveal_button = QPushButton("Reveal")
         self.reveal_button.clicked.connect(self.reveal_in_finder)
@@ -665,6 +683,10 @@ class DiagramWindow(QMainWindow):
         # Reveal in Finder (Cmd+R on Mac, Ctrl+R on others)
         reveal_finder_shortcut = QShortcut(QKeySequence("Ctrl+R"), self)
         reveal_finder_shortcut.activated.connect(self.reveal_in_finder)
+        
+        # Fit to diagram (F key)
+        fit_shortcut = QShortcut(QKeySequence("F"), self)
+        fit_shortcut.activated.connect(self.fit_to_diagram)
 
     def toggle_format(self):
         """Toggle between SVG and PNG formats using radio buttons."""
@@ -759,9 +781,56 @@ class DiagramWindow(QMainWindow):
             self.current_zoom_scale = 1.0  # Reset to 1:1 pixel ratio
             self._update_zoom_label()
 
+    def fit_to_diagram(self):
+        """Resize the window to fit the diagram exactly with no scrollbars."""
+        if not hasattr(self, 'pixmap_item') or self.pixmap_item is None:
+            return
+            
+        # Get the pixmap dimensions (these are the logical dimensions, not physical)
+        pixmap = self.pixmap_item.pixmap()
+        pixmap_size = pixmap.size()
+        
+        # Account for device pixel ratio to get actual display size
+        device_pixel_ratio = self.devicePixelRatio()
+        logical_width = int(pixmap_size.width() / device_pixel_ratio)
+        logical_height = int(pixmap_size.height() / device_pixel_ratio)
+        
+        # Reset zoom to 1:1 first to get accurate measurements
+        self.reset_zoom()
+        
+        # Get the graphics view's viewport size to understand available space
+        viewport_size = self.graphics_view.viewport().size()
+        
+        # Calculate how much space is taken up by non-viewport elements
+        view_total_size = self.graphics_view.size()
+        scrollbar_width = view_total_size.width() - viewport_size.width()
+        scrollbar_height = view_total_size.height() - viewport_size.height()
+        
+        # Calculate the required graphics view size (diagram + scrollbar space)
+        required_view_width = logical_width + scrollbar_width
+        required_view_height = logical_height + scrollbar_height
+        
+        # Calculate the current "chrome" size (window - graphics view)
+        current_window_size = self.size()
+        current_view_size = self.graphics_view.size()
+        chrome_width = current_window_size.width() - current_view_size.width()
+        chrome_height = current_window_size.height() - current_view_size.height()
+        
+        # Calculate the target window size
+        target_width = required_view_width + chrome_width
+        target_height = required_view_height + chrome_height
+        
+        # Add a small buffer to ensure no scrollbars appear
+        buffer_width = 4
+        buffer_height = 4
+        
+        # Resize the window to exactly fit the diagram
+        self.resize(target_width + buffer_width, target_height + buffer_height)
+
     def showEvent(self, event):
         """Handle window show event to set focus to graphics view."""
         super().showEvent(event)
+        
         # Set focus to graphics view for keyboard navigation
         # Use a small delay to ensure focus is set after all other UI updates
         if hasattr(self, 'graphics_view') and self.graphics_view:
@@ -773,6 +842,12 @@ class DiagramWindow(QMainWindow):
                 except (RuntimeError, AttributeError):
                     pass
             QTimer.singleShot(50, safe_set_focus)
+    
+    def hideEvent(self, event):
+        """Handle window hide event to prepare for auto-fit on reappear."""
+        super().hideEvent(event)
+        # Set flag so that auto-fit will trigger when window reappears and image is displayed
+        self.should_auto_fit = True
 
     def focusInEvent(self, event):
         """Handle window focus event to set focus to graphics view."""

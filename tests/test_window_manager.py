@@ -1006,6 +1006,273 @@ class TestDiagramWindowToolbar:
         window.reset_zoom()
         assert window.zoom_label.text() == "100%"
 
+    def test_fit_button_creation(self, qtbot):
+        """Test that fit button is created and positioned correctly."""
+        from dacwatch.window_manager import DiagramWindow
+        from PySide6.QtWidgets import QPushButton, QToolBar
+        
+        # Create a real DiagramWindow
+        window = DiagramWindow("/path/to/test/file.dot")
+        qtbot.addWidget(window)
+        
+        # Check that toolbars exist
+        toolbars = window.findChildren(QToolBar)
+        assert len(toolbars) >= 1
+        
+        toolbar = toolbars[0]
+        
+        # Find fit button
+        buttons = toolbar.findChildren(QPushButton)
+        fit_button = None
+        for button in buttons:
+            if button.text() == "Fit":
+                fit_button = button
+                break
+        
+        assert fit_button is not None, "Fit button should exist"
+        assert hasattr(window, 'fit_button'), "Window should have fit_button attribute"
+        assert window.fit_button.text() == "Fit"
+        
+        # Verify button order: should be after Copy Error and before Reveal
+        button_texts = [button.text() for button in buttons]
+        
+        # Find indices of buttons
+        copy_error_index = None
+        fit_index = None
+        reveal_index = None
+        
+        for i, text in enumerate(button_texts):
+            if "📋 Error" in text:
+                copy_error_index = i
+            elif text == "Fit":
+                fit_index = i
+            elif text == "Reveal":
+                reveal_index = i
+        
+        # Verify the order
+        assert copy_error_index is not None, "Copy Error button should exist"
+        assert fit_index is not None, "Fit button should exist"
+        assert reveal_index is not None, "Reveal button should exist"
+        assert copy_error_index < fit_index < reveal_index, "Fit button should be between Copy Error and Reveal buttons"
+
+    def test_fit_to_diagram_functionality(self, qtbot):
+        """Test fit to diagram functionality."""
+        from dacwatch.window_manager import DiagramWindow
+        from unittest.mock import Mock
+        
+        # Create a real window
+        window = DiagramWindow("test.svg")
+        qtbot.addWidget(window)
+        
+        # Create test SVG content with specific dimensions
+        svg_content = '''<svg width="300" height="200" xmlns="http://www.w3.org/2000/svg">
+            <rect x="0" y="0" width="300" height="200" fill="blue"/>
+        </svg>'''
+        
+        # Display the image to set up graphics view and pixmap
+        window.display_image(svg_content.encode(), "svg")
+        
+        # Verify the image was loaded
+        assert hasattr(window, 'pixmap_item') and window.pixmap_item is not None
+        assert hasattr(window, 'graphics_view') and window.graphics_view is not None
+        
+        # Mock the window resize method to capture calls
+        original_resize = window.resize
+        window.resize = Mock(side_effect=original_resize)
+        
+        # Mock size methods to return predictable values for testing
+        mock_window_size = Mock()
+        mock_window_size.width = Mock(return_value=800)
+        mock_window_size.height = Mock(return_value=600)
+        window.size = Mock(return_value=mock_window_size)
+        
+        mock_view_size = Mock()
+        mock_view_size.width = Mock(return_value=700)
+        mock_view_size.height = Mock(return_value=500)
+        window.graphics_view.size = Mock(return_value=mock_view_size)
+        
+        # Mock viewport size for fit calculation
+        mock_viewport_size = Mock()
+        mock_viewport_size.width = Mock(return_value=680)
+        mock_viewport_size.height = Mock(return_value=480)
+        window.graphics_view.viewport = Mock()
+        window.graphics_view.viewport.return_value.size = Mock(return_value=mock_viewport_size)
+        
+        # Call fit_to_diagram
+        window.fit_to_diagram()
+        
+        # Verify resize was called
+        window.resize.assert_called_once()
+        
+        # The exact dimensions depend on the SVG size and device pixel ratio
+        # Just verify that resize was called with positive integers
+        args = window.resize.call_args[0]
+        assert len(args) == 2, "resize should be called with width and height"
+        assert isinstance(args[0], int) and args[0] > 0, "width should be positive integer"
+        assert isinstance(args[1], int) and args[1] > 0, "height should be positive integer"
+
+    def test_fit_to_diagram_without_image(self, qtbot):
+        """Test fit to diagram when no image is loaded."""
+        from dacwatch.window_manager import DiagramWindow
+        from unittest.mock import Mock
+        
+        # Create a real window
+        window = DiagramWindow("test.svg")
+        qtbot.addWidget(window)
+        
+        # Mock the resize method to verify it's not called
+        window.resize = Mock()
+        
+        # Call fit_to_diagram without loading an image
+        window.fit_to_diagram()
+        
+        # Verify resize was not called since no image is loaded
+        window.resize.assert_not_called()
+
+    def test_fit_to_diagram_resets_zoom(self, qtbot):
+        """Test that fit to diagram resets zoom to 1:1."""
+        from dacwatch.window_manager import DiagramWindow
+        from unittest.mock import Mock, patch
+        
+        # Create a real window
+        window = DiagramWindow("test.svg")
+        qtbot.addWidget(window)
+        
+        # Create test SVG content
+        svg_content = '''<svg width="100" height="100" xmlns="http://www.w3.org/2000/svg">
+            <rect x="0" y="0" width="100" height="100" fill="red"/>
+        </svg>'''
+        
+        # Display the image
+        window.display_image(svg_content.encode(), "svg")
+        
+        # Zoom in first to verify reset
+        window.zoom_in()
+        initial_zoom = window.current_zoom_scale
+        assert initial_zoom > 1.0, "Should be zoomed in"
+        
+        # Mock reset_zoom to verify it's called
+        with patch.object(window, 'reset_zoom') as mock_reset_zoom:
+            # Mock size methods and resize to avoid actual window changes
+            mock_window_size = Mock()
+            mock_window_size.width = Mock(return_value=800)
+            mock_window_size.height = Mock(return_value=600)
+            window.size = Mock(return_value=mock_window_size)
+            
+            mock_view_size = Mock()
+            mock_view_size.width = Mock(return_value=700)
+            mock_view_size.height = Mock(return_value=500)
+            window.graphics_view.size = Mock(return_value=mock_view_size)
+            
+            # Mock viewport size for fit calculation
+            mock_viewport_size = Mock()
+            mock_viewport_size.width = Mock(return_value=680)
+            mock_viewport_size.height = Mock(return_value=480)
+            window.graphics_view.viewport = Mock()
+            window.graphics_view.viewport.return_value.size = Mock(return_value=mock_viewport_size)
+            
+            window.resize = Mock()
+            
+            # Call fit_to_diagram
+            window.fit_to_diagram()
+            
+            # Verify reset_zoom was called
+            mock_reset_zoom.assert_called_once()
+
+    def test_auto_fit_on_window_show(self, qtbot):
+        """Test that auto-fit is triggered when window first displays image."""
+        from dacwatch.window_manager import DiagramWindow
+        from unittest.mock import Mock, patch
+        
+        # Create a real window and show it
+        window = DiagramWindow("test.svg")
+        qtbot.addWidget(window)
+        window.show()
+        
+        # Create test SVG content
+        svg_content = '''<svg width="200" height="150" xmlns="http://www.w3.org/2000/svg">
+            <rect x="0" y="0" width="200" height="150" fill="green"/>
+        </svg>'''
+        
+        # Mock fit_to_diagram to verify it gets called
+        with patch.object(window, 'fit_to_diagram') as mock_fit:
+            # Display the image (this should trigger auto-fit)
+            window.display_image(svg_content.encode(), "svg")
+            
+            # Wait for the timer to execute
+            qtbot.wait(100)  # Wait for the 50ms timer
+            
+            # Verify fit_to_diagram was called during image display
+            mock_fit.assert_called_once()
+
+    def test_auto_fit_on_window_reappear(self, qtbot):
+        """Test that auto-fit is triggered when window reappears after being hidden."""
+        from dacwatch.window_manager import DiagramWindow
+        from unittest.mock import Mock, patch
+        
+        # Create and show window initially
+        window = DiagramWindow("test.svg")
+        qtbot.addWidget(window)
+        window.show()
+        
+        # Create test SVG content
+        svg_content = '''<svg width="200" height="150" xmlns="http://www.w3.org/2000/svg">
+            <rect x="0" y="0" width="200" height="150" fill="green"/>
+        </svg>'''
+        
+        # Display initial image (this should trigger auto-fit)
+        window.display_image(svg_content.encode(), "svg")
+        qtbot.wait(100)  # Wait for initial auto-fit
+        
+        # Hide the window (this sets should_auto_fit = True)
+        window.hide()
+        qtbot.wait(50)
+        
+        # Show the window again
+        window.show()
+        qtbot.wait(50)
+        
+        # Mock fit_to_diagram to verify it gets called on next image display
+        with patch.object(window, 'fit_to_diagram') as mock_fit:
+            # Display image again (this should trigger auto-fit because window was hidden/shown)
+            window.display_image(svg_content.encode(), "svg")
+            qtbot.wait(100)  # Wait for the timer to execute
+            
+            # Verify fit_to_diagram was called when image was displayed after reappearing
+            mock_fit.assert_called_once()
+
+    def test_no_auto_fit_on_image_reload(self, qtbot):
+        """Test that auto-fit is NOT triggered when image is reloaded while window is visible."""
+        from dacwatch.window_manager import DiagramWindow
+        from unittest.mock import Mock, patch
+        
+        # Create and show window
+        window = DiagramWindow("test.svg")
+        qtbot.addWidget(window)
+        window.show()
+        
+        # Create test SVG content
+        svg_content1 = '''<svg width="200" height="150" xmlns="http://www.w3.org/2000/svg">
+            <rect x="0" y="0" width="200" height="150" fill="green"/>
+        </svg>'''
+        
+        svg_content2 = '''<svg width="300" height="200" xmlns="http://www.w3.org/2000/svg">
+            <rect x="0" y="0" width="300" height="200" fill="blue"/>
+        </svg>'''
+        
+        # Display initial image (this should trigger auto-fit and reset should_auto_fit to False)
+        window.display_image(svg_content1.encode(), "svg")
+        qtbot.wait(100)  # Wait for initial auto-fit
+        
+        # Mock fit_to_diagram to verify it's NOT called on image reload
+        with patch.object(window, 'fit_to_diagram') as mock_fit:
+            # Reload image while window is visible (should_auto_fit is now False)
+            window.display_image(svg_content2.encode(), "svg")
+            qtbot.wait(100)  # Wait to see if auto-fit gets called
+            
+            # Verify fit_to_diagram was NOT called during image reload
+            mock_fit.assert_not_called()
+
     def test_copy_source_to_clipboard(self):
         """Test copying source code to clipboard."""
         from unittest.mock import patch, Mock
