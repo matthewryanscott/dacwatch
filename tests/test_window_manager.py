@@ -404,9 +404,11 @@ class TestDiagramWindowImageDisplay:
         # Verify pixmap item was created
         assert window.pixmap_item is not None
         
-        # Verify format label was updated
-        assert window.format_label is not None
-        assert window.format_label.text() == "Format: SVG"
+        # Verify format radio buttons were updated
+        assert hasattr(window, 'svg_radio') and window.svg_radio is not None
+        assert hasattr(window, 'png_radio') and window.png_radio is not None
+        assert window.svg_radio.isChecked() == True
+        assert window.png_radio.isChecked() == False
 
     def test_display_image_png_format(self, qtbot):
         """Test displaying PNG image data using real Qt widgets."""
@@ -426,9 +428,11 @@ class TestDiagramWindowImageDisplay:
         assert window.graphics_view is not None
         assert isinstance(window.graphics_view, ZoomableGraphicsView)
         
-        # Verify format label was updated
-        assert window.format_label is not None
-        assert window.format_label.text() == "Format: PNG"
+        # Verify format radio buttons were updated
+        assert hasattr(window, 'svg_radio') and window.svg_radio is not None
+        assert hasattr(window, 'png_radio') and window.png_radio is not None
+        assert window.svg_radio.isChecked() == False
+        assert window.png_radio.isChecked() == True
 
     def test_display_image_replaces_loading_label(self, qtbot):
         """Test that display_image replaces the loading label with graphics view."""
@@ -469,9 +473,11 @@ class TestDiagramWindowImageDisplay:
         assert window.graphics_view is not None
         assert isinstance(window.graphics_view, ZoomableGraphicsView)
         
-        # Verify format label was updated
-        assert window.format_label is not None
-        assert window.format_label.text() == "Format: SVG"
+        # Verify format radio buttons were updated
+        assert hasattr(window, 'svg_radio') and window.svg_radio is not None
+        assert hasattr(window, 'png_radio') and window.png_radio is not None
+        assert window.svg_radio.isChecked() == True
+        assert window.png_radio.isChecked() == False
 
     def test_display_image_invalid_format(self):
         """Test display_image with invalid format parameter."""
@@ -492,10 +498,10 @@ class TestDiagramWindowImageDisplay:
 class TestDiagramWindowToolbar:
     """Test suite for DiagramWindow toolbar functionality."""
 
-    def test_toggle_format_button_creation(self, qtbot):
-        """Test that toggle format button is created and configured using real Qt widgets."""
+    def test_format_radio_buttons_creation(self, qtbot):
+        """Test that format radio buttons are created and configured using real Qt widgets."""
         from dacwatch.window_manager import DiagramWindow
-        from PySide6.QtWidgets import QPushButton, QToolBar, QLabel
+        from PySide6.QtWidgets import QRadioButton, QToolBar, QButtonGroup
         
         # Create a real DiagramWindow
         window = DiagramWindow("/path/to/test/file.dot")
@@ -507,26 +513,26 @@ class TestDiagramWindowToolbar:
         
         toolbar = toolbars[0]
         
-        # Find buttons in the toolbar
-        buttons = toolbar.findChildren(QPushButton)
-        toggle_button = None
-        for button in buttons:
-            if "Toggle" in button.text():
-                toggle_button = button
-                break
+        # Check that format radio buttons exist
+        assert hasattr(window, 'svg_radio') and window.svg_radio is not None
+        assert hasattr(window, 'png_radio') and window.png_radio is not None
         
-        assert toggle_button is not None, "Toggle SVG/PNG button should exist"
+        # Verify they are QRadioButton instances
+        assert isinstance(window.svg_radio, QRadioButton)
+        assert isinstance(window.png_radio, QRadioButton)
         
-        # Check that format label exists
-        assert hasattr(window, 'format_label')
-        assert window.format_label is not None
+        # Check that button group exists
+        assert hasattr(window, 'format_button_group') and window.format_button_group is not None
+        assert isinstance(window.format_button_group, QButtonGroup)
         
-        # Verify the format label is a QLabel
-        assert isinstance(window.format_label, QLabel)
+        # Check that radio buttons are in the toolbar
+        radio_buttons_in_toolbar = toolbar.findChildren(QRadioButton)
+        assert window.svg_radio in radio_buttons_in_toolbar
+        assert window.png_radio in radio_buttons_in_toolbar
         
-        # Check that format label is in the toolbar
-        labels_in_toolbar = toolbar.findChildren(QLabel)
-        assert window.format_label in labels_in_toolbar
+        # Check default state (SVG should be selected)
+        assert window.svg_radio.isChecked() == True
+        assert window.png_radio.isChecked() == False
 
     def test_copy_image_button_creation(self, qtbot):
         """Test that copy image button is created and configured."""
@@ -603,56 +609,78 @@ class TestDiagramWindowToolbar:
         
         assert reveal_button is not None, "Reveal in Finder button should exist"
         
-        # Verify we have all expected buttons
+        # Verify we have all expected buttons (excluding the removed toggle button)
         button_texts = [button.text() for button in buttons]
-        expected_buttons = ["Toggle SVG/PNG", "Copy Image", "Copy Source", "Reveal in Finder"]
+        expected_buttons = ["Copy Image", "Copy Source", "Reveal in Finder"]
         for expected in expected_buttons:
             assert expected in button_texts, f"Button '{expected}' should exist"
 
-    def test_toggle_format_functionality(self):
-        """Test toggle format functionality."""
-        from unittest.mock import patch, Mock
-
-        # Create a mock window object
-        mock_window = Mock()
-        mock_window.current_format = "svg"
-        mock_window.image_data = b'<svg>test</svg>'
-        mock_window.format_toggle_callback = Mock()
-
-        # Import and bind the method to our mock
+    def test_format_radio_functionality(self, qtbot):
+        """Test format radio button functionality."""
         from dacwatch.window_manager import DiagramWindow
-        mock_window.toggle_format = DiagramWindow.toggle_format.__get__(mock_window, DiagramWindow)
-
-        # Call toggle_format
-        mock_window.toggle_format()
-
+        from unittest.mock import Mock
+        
+        # Create a real window
+        window = DiagramWindow("/test/file.svg")
+        qtbot.addWidget(window)
+        
+        # Mock the format toggle callback
+        window.format_toggle_callback = Mock()
+        window.current_format = "svg"
+        window.image_data = b'<svg>test</svg>'
+        
+        # Initially SVG should be selected
+        assert window.svg_radio.isChecked() == True
+        assert window.png_radio.isChecked() == False
+        
+        # Select PNG radio button
+        window.png_radio.setChecked(True)
+        
+        # Process events to ensure signal is handled
+        qtbot.wait(10)
+        
         # Verify callback was called with PNG format
-        mock_window.format_toggle_callback.assert_called_once_with("png")
+        window.format_toggle_callback.assert_called_once_with("png")
+        
+        # Reset mock for second test
+        window.format_toggle_callback.reset_mock()
+        window.current_format = "png"
+        
+        # Select SVG radio button
+        window.svg_radio.setChecked(True)
+        
+        # Process events
+        qtbot.wait(10)
+        
+        # Verify callback was called with SVG format
+        window.format_toggle_callback.assert_called_once_with("svg")
 
-    def test_format_label_functionality(self, qtbot):
-        """Test that format label shows correct format and updates properly."""
+    def test_format_radio_state_updates(self, qtbot):
+        """Test that format radio buttons show correct format and update properly."""
         from dacwatch.window_manager import DiagramWindow
-        from PySide6.QtWidgets import QLabel
+        from PySide6.QtWidgets import QRadioButton
         
         # Create a real DiagramWindow
         window = DiagramWindow("/path/to/test/file.dot")
         qtbot.addWidget(window)
         
-        # Check that format label exists
-        assert hasattr(window, 'format_label')
-        assert isinstance(window.format_label, QLabel)
+        # Check that format radio buttons exist
+        assert hasattr(window, 'svg_radio') and isinstance(window.svg_radio, QRadioButton)
+        assert hasattr(window, 'png_radio') and isinstance(window.png_radio, QRadioButton)
         
-        # Test display_image updates format label
+        # Test display_image updates radio button states
         test_svg_data = b'<svg>test</svg>'
         test_png_data = b'PNG\x89test'
         
         # Test SVG format
         window.display_image(test_svg_data, "svg")
-        assert window.format_label.text() == "Format: SVG"
+        assert window.svg_radio.isChecked() == True
+        assert window.png_radio.isChecked() == False
         
         # Test PNG format
         window.display_image(test_png_data, "png")
-        assert window.format_label.text() == "Format: PNG"
+        assert window.svg_radio.isChecked() == False
+        assert window.png_radio.isChecked() == True
 
     def test_copy_image_to_clipboard(self, qtbot):
         """Test copying image to clipboard with transparency validation."""

@@ -283,10 +283,16 @@ class DiagramWindow(QMainWindow):
         # Update zoom label
         self._update_zoom_label()
 
-        # Update format label
-        if self.format_label:
-            self.format_label.setText(f"Format: {format.upper()}")
-            self.format_label.show()
+        # Update format radio buttons
+        if hasattr(self, 'svg_radio') and hasattr(self, 'png_radio'):
+            # Re-enable radio buttons (in case they were disabled due to error)
+            self.svg_radio.setEnabled(True)
+            self.png_radio.setEnabled(True)
+            
+            if format == "svg":
+                self.svg_radio.setChecked(True)
+            else:
+                self.png_radio.setChecked(True)
 
         # Replace loading label or existing image with graphics view
         central_widget = self.centralWidget()
@@ -329,11 +335,17 @@ class DiagramWindow(QMainWindow):
         graphics_view.setFocus()
         
         # Set tab order to ensure graphics view is first in tab order
-        if hasattr(self, 'toggle_button') and self.toggle_button:
-            self.setTabOrder(graphics_view, self.toggle_button)
+        if hasattr(self, 'svg_radio') and self.svg_radio:
+            self.setTabOrder(graphics_view, self.svg_radio)
         
         # Use a delayed focus set to override any competing focus attempts
-        QTimer.singleShot(50, lambda: graphics_view.setFocus() if hasattr(self, 'graphics_view') and self.graphics_view else None)
+        def safe_set_focus():
+            try:
+                if hasattr(self, 'graphics_view') and self.graphics_view:
+                    self.graphics_view.setFocus()
+            except (RuntimeError, AttributeError):
+                pass  # Widget may have been deleted
+        QTimer.singleShot(50, safe_set_focus)
         
         # Disable Copy Error button when displaying successful images
         if hasattr(self, 'copy_error_button'):
@@ -465,10 +477,10 @@ class DiagramWindow(QMainWindow):
             self.copy_error_button.setEnabled(True)
             self.copy_error_button.setStyleSheet("QPushButton { color: black; }")
         
-        # Update format label to show error state
-        if self.format_label:
-            self.format_label.setText("Error")
-            self.format_label.show()
+        # In error state, disable format radio buttons
+        if hasattr(self, 'svg_radio') and hasattr(self, 'png_radio'):
+            self.svg_radio.setEnabled(False)
+            self.png_radio.setEnabled(False)
 
     def _setup_toolbar(self):
         """Setup the toolbar with action buttons."""
@@ -478,11 +490,6 @@ class DiagramWindow(QMainWindow):
         # Create toolbar
         toolbar = QToolBar("Diagram Actions")
         self.addToolBar(Qt.ToolBarArea.TopToolBarArea, toolbar)
-
-        # Toggle format button
-        self.toggle_button = QPushButton("Toggle SVG/PNG")
-        self.toggle_button.clicked.connect(self.toggle_format)
-        toolbar.addWidget(self.toggle_button)
 
         # Copy image button
         self.copy_image_button = QPushButton("Copy Image")
@@ -509,11 +516,46 @@ class DiagramWindow(QMainWindow):
         # Always on top toggle - using action for cleaner state management
         toolbar.addAction(self.always_on_top_action)
 
-        # Create format label for toolbar
-        from PySide6.QtWidgets import QLabel
-        self.format_label = QLabel("")
-        self.format_label.setStyleSheet("color: gray; font-size: 12px; padding: 5px;")
-        toolbar.addWidget(self.format_label)
+        # Create format selection radio buttons
+        from PySide6.QtWidgets import QLabel, QRadioButton, QHBoxLayout, QWidget, QButtonGroup
+        
+        # Create a widget to hold the radio buttons
+        format_widget = QWidget()
+        format_layout = QHBoxLayout(format_widget)
+        format_layout.setContentsMargins(5, 0, 5, 0)
+        format_layout.setSpacing(5)
+        
+        # Create radio buttons for format selection
+        self.svg_radio = QRadioButton("SVG")
+        self.png_radio = QRadioButton("PNG")
+        
+        # Style the radio buttons
+        radio_style = """
+            QRadioButton {
+                font-size: 12px;
+                padding: 2px;
+            }
+        """
+        self.svg_radio.setStyleSheet(radio_style)
+        self.png_radio.setStyleSheet(radio_style)
+        
+        # Create button group to manage exclusive selection
+        self.format_button_group = QButtonGroup()
+        self.format_button_group.addButton(self.svg_radio, 0)  # 0 for SVG
+        self.format_button_group.addButton(self.png_radio, 1)  # 1 for PNG
+        
+        # Set default selection (SVG)
+        self.svg_radio.setChecked(True)
+        
+        # Connect signal for format changes
+        self.format_button_group.idToggled.connect(self._on_format_radio_toggled)
+        
+        # Add radio buttons to layout
+        format_layout.addWidget(self.svg_radio)
+        format_layout.addWidget(self.png_radio)
+        
+        # Add format widget to toolbar
+        toolbar.addWidget(format_widget)
         
         # Create zoom level label for toolbar
         self.zoom_label = QLabel("100%")
@@ -536,6 +578,17 @@ class DiagramWindow(QMainWindow):
             # Convert zoom scale to percentage
             zoom_percent = int(self.current_zoom_scale * 100)
             self.zoom_label.setText(f"{zoom_percent}%")
+
+    def _on_format_radio_toggled(self, button_id, checked):
+        """Handle format radio button toggle."""
+        if checked:  # Only act when a button is checked (not unchecked)
+            new_format = "svg" if button_id == 0 else "png"
+            
+            # Only trigger re-render if format actually changed
+            if new_format != self.current_format:
+                # We need to re-render with the new format
+                if hasattr(self, 'format_toggle_callback') and self.format_toggle_callback:
+                    self.format_toggle_callback(new_format)
 
     def _setup_actions(self):
         """Setup actions for toolbar and shortcuts."""
@@ -561,7 +614,13 @@ class DiagramWindow(QMainWindow):
         # Use a small delay to ensure focus is set after all other UI updates
         if hasattr(self, 'graphics_view') and self.graphics_view:
             from PySide6.QtCore import QTimer
-            QTimer.singleShot(50, lambda: self.graphics_view.setFocus() if hasattr(self, 'graphics_view') and self.graphics_view else None)
+            def safe_set_focus():
+                try:
+                    if hasattr(self, 'graphics_view') and self.graphics_view:
+                        self.graphics_view.setFocus()
+                except (RuntimeError, AttributeError):
+                    pass
+            QTimer.singleShot(50, safe_set_focus)
 
     def _setup_shortcuts(self):
         """Setup keyboard shortcuts."""
@@ -608,17 +667,16 @@ class DiagramWindow(QMainWindow):
         reveal_finder_shortcut.activated.connect(self.reveal_in_finder)
 
     def toggle_format(self):
-        """Toggle between SVG and PNG formats."""
+        """Toggle between SVG and PNG formats using radio buttons."""
         if not hasattr(self, 'image_data') or self.image_data is None:
             return
 
-        # Toggle format
-        new_format = "png" if self.current_format == "svg" else "svg"
-        
-        # We need to re-render with the new format, not just re-display
-        # This will be handled by the app when it connects to this signal
-        if hasattr(self, 'format_toggle_callback') and self.format_toggle_callback:
-            self.format_toggle_callback(new_format)
+        # Toggle the radio button selection
+        if hasattr(self, 'svg_radio') and hasattr(self, 'png_radio'):
+            if self.svg_radio.isChecked():
+                self.png_radio.setChecked(True)  # This will trigger the format change
+            else:
+                self.svg_radio.setChecked(True)  # This will trigger the format change
 
     def copy_image_to_clipboard(self):
         """Copy the current image to clipboard."""
@@ -708,7 +766,13 @@ class DiagramWindow(QMainWindow):
         # Use a small delay to ensure focus is set after all other UI updates
         if hasattr(self, 'graphics_view') and self.graphics_view:
             from PySide6.QtCore import QTimer
-            QTimer.singleShot(50, lambda: self.graphics_view.setFocus() if hasattr(self, 'graphics_view') and self.graphics_view else None)
+            def safe_set_focus():
+                try:
+                    if hasattr(self, 'graphics_view') and self.graphics_view:
+                        self.graphics_view.setFocus()
+                except (RuntimeError, AttributeError):
+                    pass
+            QTimer.singleShot(50, safe_set_focus)
 
     def focusInEvent(self, event):
         """Handle window focus event to set focus to graphics view."""
@@ -717,7 +781,13 @@ class DiagramWindow(QMainWindow):
         # Use a small delay to ensure focus is set after all other UI updates
         if hasattr(self, 'graphics_view') and self.graphics_view:
             from PySide6.QtCore import QTimer
-            QTimer.singleShot(50, lambda: self.graphics_view.setFocus() if hasattr(self, 'graphics_view') and self.graphics_view else None)
+            def safe_set_focus():
+                try:
+                    if hasattr(self, 'graphics_view') and self.graphics_view:
+                        self.graphics_view.setFocus()
+                except (RuntimeError, AttributeError):
+                    pass
+            QTimer.singleShot(50, safe_set_focus)
 
 
 class WindowManager:
