@@ -552,6 +552,10 @@ class DiagramWindow(QMainWindow):
         zoom_in_shortcut = QShortcut(QKeySequence.StandardKey.ZoomIn, self)
         zoom_in_shortcut.activated.connect(self.zoom_in)
         
+        # Additional zoom in shortcut for Cmd+= (without shift)
+        zoom_in_equal_shortcut = QShortcut(QKeySequence("Ctrl+="), self)
+        zoom_in_equal_shortcut.activated.connect(self.zoom_in)
+        
         zoom_out_shortcut = QShortcut(QKeySequence.StandardKey.ZoomOut, self)
         zoom_out_shortcut.activated.connect(self.zoom_out)
         

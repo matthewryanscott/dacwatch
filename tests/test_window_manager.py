@@ -880,6 +880,35 @@ class TestDiagramWindowToolbar:
         # The focus policy being set to StrongFocus is the main verification
         assert window.graphics_view.focusPolicy() == Qt.FocusPolicy.StrongFocus
 
+    def test_zoom_in_equal_key_shortcut(self, qtbot):
+        """Test that Cmd+= (without shift) shortcut is properly configured."""
+        from dacwatch.window_manager import DiagramWindow
+        from PySide6.QtGui import QShortcut, QKeySequence
+        
+        # Create a real window
+        window = DiagramWindow("test.svg")
+        qtbot.addWidget(window)
+        
+        # Find all shortcuts in the window
+        shortcuts = window.findChildren(QShortcut)
+        
+        # Look for the Ctrl+= shortcut
+        ctrl_equal_shortcuts = []
+        for shortcut in shortcuts:
+            if shortcut.key() == QKeySequence("Ctrl+="):
+                ctrl_equal_shortcuts.append(shortcut)
+        
+        # Verify that we have at least one Ctrl+= shortcut
+        assert len(ctrl_equal_shortcuts) >= 1, "Should have at least one Ctrl+= shortcut configured"
+        
+        # Verify that the shortcut is connected to zoom_in method
+        # We can't easily test the actual connection in a unit test, but we can verify
+        # the shortcut exists and the zoom_in method exists
+        assert hasattr(window, 'zoom_in'), "Window should have zoom_in method"
+        
+        # Verify the shortcut is enabled
+        assert ctrl_equal_shortcuts[0].isEnabled(), "Ctrl+= shortcut should be enabled"
+
     def test_copy_source_to_clipboard(self):
         """Test copying source code to clipboard."""
         from unittest.mock import patch, Mock
