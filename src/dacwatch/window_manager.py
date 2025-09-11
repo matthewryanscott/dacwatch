@@ -109,10 +109,14 @@ class ZoomableGraphicsView(QGraphicsView):
                 
                 # Notify parent window of zoom change if available
                 if self.parent_window and hasattr(self.parent_window, 'current_zoom_scale'):
-                    self.parent_window.current_zoom_scale = self.get_current_scale()
-                    # Update zoom label if available
-                    if hasattr(self.parent_window, '_update_zoom_label'):
-                        self.parent_window._update_zoom_label()
+                    try:
+                        self.parent_window.current_zoom_scale = self.get_current_scale()
+                        # Update zoom label if available
+                        if hasattr(self.parent_window, '_update_zoom_label'):
+                            self.parent_window._update_zoom_label()
+                    except (RuntimeError, AttributeError):
+                        # Parent window might have been deleted
+                        pass
             return True
         return False
 
@@ -167,17 +171,22 @@ class ZoomableGraphicsView(QGraphicsView):
     def mouseMoveEvent(self, event):
         """Handle mouse move events for window dragging and normal graphics view behavior."""
         if self.dragging_window and self.drag_start_position is not None and self.parent_window:
-            # Calculate the movement delta
-            delta = event.globalPosition().toPoint() - self.drag_start_position
-            
-            # Move the parent window
-            new_position = self.parent_window.pos() + delta
-            self.parent_window.move(new_position)
-            
-            # Update drag start position for next move event
-            self.drag_start_position = event.globalPosition().toPoint()
-            event.accept()
-            return
+            try:
+                # Calculate the movement delta
+                delta = event.globalPosition().toPoint() - self.drag_start_position
+                
+                # Move the parent window
+                new_position = self.parent_window.pos() + delta
+                self.parent_window.move(new_position)
+                
+                # Update drag start position for next move event
+                self.drag_start_position = event.globalPosition().toPoint()
+                event.accept()
+                return
+            except (RuntimeError, AttributeError):
+                # Parent window might have been deleted
+                self.dragging_window = False
+                self.drag_start_position = None
         
         # Let the base class handle other cases
         super().mouseMoveEvent(event)
@@ -320,7 +329,11 @@ class DiagramWindow(QMainWindow):
         
         # Save current zoom before replacing view (only if not first display)
         if not self.is_first_display and hasattr(self, 'graphics_view') and self.graphics_view:
-            self.current_zoom_scale = self.graphics_view.get_current_scale()
+            try:
+                self.current_zoom_scale = self.graphics_view.get_current_scale()
+            except (RuntimeError, AttributeError):
+                # Graphics view might have been deleted, use current stored value
+                pass
         
         if self.is_first_display:
             # First time - reset transform for true 1:1 display (no scaling)
@@ -373,6 +386,7 @@ class DiagramWindow(QMainWindow):
                     try:
                         layout.removeWidget(self.graphics_view)
                         self.graphics_view.deleteLater()
+                        self.graphics_view = None  # Clear reference immediately
                     except (RuntimeError, AttributeError):
                         pass
                 
@@ -381,7 +395,7 @@ class DiagramWindow(QMainWindow):
                     try:
                         layout.removeWidget(self.error_widget)
                         self.error_widget.deleteLater()
-                        self.error_widget = None
+                        self.error_widget = None  # Clear reference immediately
                     except (RuntimeError, AttributeError):
                         pass
                 
@@ -644,9 +658,13 @@ class DiagramWindow(QMainWindow):
     def _update_zoom_label(self):
         """Update the zoom label with current zoom percentage."""
         if hasattr(self, 'zoom_label') and self.zoom_label:
-            # Convert zoom scale to percentage
-            zoom_percent = int(self.current_zoom_scale * 100)
-            self.zoom_label.setText(f"{zoom_percent}%")
+            try:
+                # Convert zoom scale to percentage
+                zoom_percent = int(self.current_zoom_scale * 100)
+                self.zoom_label.setText(f"{zoom_percent}%")
+            except (RuntimeError, AttributeError):
+                # Label might have been deleted
+                pass
 
     def _on_format_radio_toggled(self, button_id, checked):
         """Handle format radio button toggle."""
@@ -756,26 +774,31 @@ class DiagramWindow(QMainWindow):
         if not hasattr(self, 'pixmap_item') or self.pixmap_item is None:
             return
 
-        from PySide6.QtWidgets import QApplication
-        from PySide6.QtGui import QImage
-        from PySide6.QtCore import QBuffer, QIODevice
+        try:
+            from PySide6.QtWidgets import QApplication
+            from PySide6.QtGui import QImage
+            from PySide6.QtCore import QBuffer, QIODevice
 
-        # Get pixmap from the graphics item
-        pixmap = self.pixmap_item.pixmap()
+            # Get pixmap from the graphics item
+            pixmap = self.pixmap_item.pixmap()
 
-        # Convert to QImage with explicit transparency support
-        image = pixmap.toImage()
+            # Convert to QImage with explicit transparency support
+            image = pixmap.toImage()
 
-        # Ensure the image has an alpha channel for transparency
-        if image.format() != QImage.Format.Format_ARGB32:
-            image = image.convertToFormat(QImage.Format.Format_ARGB32)
+            # Ensure the image has an alpha channel for transparency
+            if image.format() != QImage.Format.Format_ARGB32:
+                image = image.convertToFormat(QImage.Format.Format_ARGB32)
 
-        # Copy to clipboard
-        clipboard = QApplication.clipboard()
-        clipboard.setImage(image)
-        
-        # Show toast notification
-        self.toast.show_toast("Copied image")
+            # Copy to clipboard
+            clipboard = QApplication.clipboard()
+            clipboard.setImage(image)
+            
+            # Show toast notification
+            if hasattr(self, 'toast') and self.toast:
+                self.toast.show_toast("Copied image")
+        except (RuntimeError, AttributeError):
+            # Pixmap item or toast might have been deleted
+            pass
 
     def copy_source_to_clipboard(self):
         """Copy the source code to clipboard."""
@@ -814,69 +837,89 @@ class DiagramWindow(QMainWindow):
     def zoom_in(self):
         """Zoom in on the image."""
         if hasattr(self, 'graphics_view') and self.graphics_view:
-            self.graphics_view.scale(1.25, 1.25)
-            self.current_zoom_scale = self.graphics_view.get_current_scale()
-            self._update_zoom_label()
+            try:
+                self.graphics_view.scale(1.25, 1.25)
+                self.current_zoom_scale = self.graphics_view.get_current_scale()
+                self._update_zoom_label()
+            except (RuntimeError, AttributeError):
+                # Graphics view might have been deleted
+                pass
 
     def zoom_out(self):
         """Zoom out on the image."""
         if hasattr(self, 'graphics_view') and self.graphics_view:
-            self.graphics_view.scale(0.8, 0.8)
-            self.current_zoom_scale = self.graphics_view.get_current_scale()
-            self._update_zoom_label()
+            try:
+                self.graphics_view.scale(0.8, 0.8)
+                self.current_zoom_scale = self.graphics_view.get_current_scale()
+                self._update_zoom_label()
+            except (RuntimeError, AttributeError):
+                # Graphics view might have been deleted
+                pass
 
     def reset_zoom(self):
         """Reset zoom to 1:1 pixel ratio (no scaling)."""
         if hasattr(self, 'graphics_view') and self.graphics_view:
-            self.graphics_view.reset_zoom()
-            self.current_zoom_scale = 1.0  # Reset to 1:1 pixel ratio
-            self._update_zoom_label()
+            try:
+                self.graphics_view.reset_zoom()
+                self.current_zoom_scale = 1.0  # Reset to 1:1 pixel ratio
+                self._update_zoom_label()
+            except (RuntimeError, AttributeError):
+                # Graphics view might have been deleted
+                pass
 
     def fit_to_diagram(self):
         """Resize the window to fit the diagram exactly with no scrollbars."""
         if not hasattr(self, 'pixmap_item') or self.pixmap_item is None:
             return
+        
+        # Check if graphics view exists and is not deleted    
+        if not hasattr(self, 'graphics_view') or self.graphics_view is None:
+            return
             
-        # Get the pixmap dimensions (these are the logical dimensions, not physical)
-        pixmap = self.pixmap_item.pixmap()
-        pixmap_size = pixmap.size()
-        
-        # Account for device pixel ratio to get actual display size
-        device_pixel_ratio = self.devicePixelRatio()
-        logical_width = int(pixmap_size.width() / device_pixel_ratio)
-        logical_height = int(pixmap_size.height() / device_pixel_ratio)
-        
-        # Reset zoom to 1:1 first to get accurate measurements
-        self.reset_zoom()
-        
-        # Get the graphics view's viewport size to understand available space
-        viewport_size = self.graphics_view.viewport().size()
-        
-        # Calculate how much space is taken up by non-viewport elements
-        view_total_size = self.graphics_view.size()
-        scrollbar_width = view_total_size.width() - viewport_size.width()
-        scrollbar_height = view_total_size.height() - viewport_size.height()
-        
-        # Calculate the required graphics view size (diagram + scrollbar space)
-        required_view_width = logical_width + scrollbar_width
-        required_view_height = logical_height + scrollbar_height
-        
-        # Calculate the current "chrome" size (window - graphics view)
-        current_window_size = self.size()
-        current_view_size = self.graphics_view.size()
-        chrome_width = current_window_size.width() - current_view_size.width()
-        chrome_height = current_window_size.height() - current_view_size.height()
-        
-        # Calculate the target window size
-        target_width = required_view_width + chrome_width
-        target_height = required_view_height + chrome_height
-        
-        # Add a small buffer to ensure no scrollbars appear
-        buffer_width = 4
-        buffer_height = 4
-        
-        # Resize the window to exactly fit the diagram
-        self.resize(target_width + buffer_width, target_height + buffer_height)
+        try:
+            # Get the pixmap dimensions (these are the logical dimensions, not physical)
+            pixmap = self.pixmap_item.pixmap()
+            pixmap_size = pixmap.size()
+            
+            # Account for device pixel ratio to get actual display size
+            device_pixel_ratio = self.devicePixelRatio()
+            logical_width = int(pixmap_size.width() / device_pixel_ratio)
+            logical_height = int(pixmap_size.height() / device_pixel_ratio)
+            
+            # Reset zoom to 1:1 first to get accurate measurements
+            self.reset_zoom()
+            
+            # Get the graphics view's viewport size to understand available space
+            viewport_size = self.graphics_view.viewport().size()
+            
+            # Calculate how much space is taken up by non-viewport elements
+            view_total_size = self.graphics_view.size()
+            scrollbar_width = view_total_size.width() - viewport_size.width()
+            scrollbar_height = view_total_size.height() - viewport_size.height()
+            
+            # Calculate the required graphics view size (diagram + scrollbar space)
+            required_view_width = logical_width + scrollbar_width
+            required_view_height = logical_height + scrollbar_height
+            
+            # Calculate the current "chrome" size (window - graphics view)
+            current_window_size = self.size()
+            current_view_size = self.graphics_view.size()
+            chrome_width = current_window_size.width() - current_view_size.width()
+            chrome_height = current_window_size.height() - current_view_size.height()
+            
+            # Calculate the target window size
+            target_width = required_view_width + chrome_width
+            target_height = required_view_height + chrome_height
+            
+            # Add a small buffer to ensure no scrollbars appear
+            buffer_width = 4
+            buffer_height = 4
+            
+            # Resize the window to exactly fit the diagram
+            self.resize(target_width + buffer_width, target_height + buffer_height)
+        except (RuntimeError, AttributeError):
+            # Graphics view or pixmap might have been deleted
+            pass
 
     def showEvent(self, event):
         """Handle window show event to set focus to graphics view."""

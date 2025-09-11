@@ -67,10 +67,18 @@ class DaCWatchApp:
             if window:
                 window.show()  # Make sure the window is visible
 
-                # Set up format toggle callback
-                window.format_toggle_callback = lambda new_format: asyncio.create_task(
-                    self._render_and_display_diagram(file_path, window, new_format)
-                )
+                # Set up format toggle callback - use a safer approach that doesn't capture window directly
+                def create_format_callback(fp, wm):
+                    def format_callback(new_format):
+                        # Get the current window reference (in case it was recreated)
+                        current_window = wm.get_window_for_file(fp)
+                        if current_window:
+                            asyncio.create_task(
+                                self._render_and_display_diagram(fp, current_window, new_format)
+                            )
+                    return format_callback
+                
+                window.format_toggle_callback = create_format_callback(file_path, self.window_manager)
 
                 # Render and display the diagram
                 try:
@@ -84,6 +92,10 @@ class DaCWatchApp:
 
     async def _render_and_display_diagram(self, file_path: str, window, format: str = "svg"):
         """Render a diagram and display it in the window."""
+        if not self.kroki_client:
+            print(f"Kroki client not available")
+            return
+            
         try:
             # Read the file content
             with open(file_path, 'r', encoding='utf-8') as f:
