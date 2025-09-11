@@ -75,6 +75,10 @@ class ZoomableGraphicsView(QGraphicsView):
         self.min_zoom = 0.1
         self.max_zoom = 10.0
         self.zoom_factor_base = 1.0015
+        
+        # Window dragging state
+        self.dragging_window = False
+        self.drag_start_position = None
 
     def wheelEvent(self, event):
         """Handle mouse wheel for scrolling (not zooming)."""
@@ -144,6 +148,53 @@ class ZoomableGraphicsView(QGraphicsView):
             # Reset transform and apply new scale
             self.resetTransform()
             self.scale(scale_factor, scale_factor)
+
+    def mousePressEvent(self, event):
+        """Handle mouse press events for window dragging and normal graphics view behavior."""
+        from PySide6.QtCore import Qt
+        
+        if event.button() == Qt.MouseButton.LeftButton:
+            # Start window drag for any left click in the graphics view
+            # This allows dragging from anywhere in the image viewer area
+            self.dragging_window = True
+            self.drag_start_position = event.globalPosition().toPoint()
+            event.accept()
+            return
+        
+        # Let the base class handle other cases (right click, etc.)
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event):
+        """Handle mouse move events for window dragging and normal graphics view behavior."""
+        if self.dragging_window and self.drag_start_position is not None and self.parent_window:
+            # Calculate the movement delta
+            delta = event.globalPosition().toPoint() - self.drag_start_position
+            
+            # Move the parent window
+            new_position = self.parent_window.pos() + delta
+            self.parent_window.move(new_position)
+            
+            # Update drag start position for next move event
+            self.drag_start_position = event.globalPosition().toPoint()
+            event.accept()
+            return
+        
+        # Let the base class handle other cases
+        super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event):
+        """Handle mouse release events for window dragging and normal graphics view behavior."""
+        from PySide6.QtCore import Qt
+        
+        if event.button() == Qt.MouseButton.LeftButton and self.dragging_window:
+            # Stop window dragging
+            self.dragging_window = False
+            self.drag_start_position = None
+            event.accept()
+            return
+        
+        # Let the base class handle other cases
+        super().mouseReleaseEvent(event)
 
 
 class DiagramWindow(QMainWindow):
