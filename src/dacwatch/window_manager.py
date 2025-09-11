@@ -205,6 +205,24 @@ class ZoomableGraphicsView(QGraphicsView):
         # Let the base class handle other cases
         super().mouseReleaseEvent(event)
 
+    def mouseDoubleClickEvent(self, event):
+        """Handle double-click events to trigger fit action."""
+        from PySide6.QtCore import Qt
+        
+        if event.button() == Qt.MouseButton.LeftButton:
+            # Trigger fit action on parent window if available
+            if self.parent_window and hasattr(self.parent_window, 'fit_to_diagram'):
+                try:
+                    self.parent_window.fit_to_diagram()
+                    event.accept()
+                    return
+                except (RuntimeError, AttributeError):
+                    # Parent window might have been deleted
+                    pass
+        
+        # Let the base class handle other cases
+        super().mouseDoubleClickEvent(event)
+
 
 class DiagramWindow(QMainWindow):
     """A window for displaying diagram files."""

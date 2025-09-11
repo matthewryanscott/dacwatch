@@ -1668,3 +1668,145 @@ class TestWindowState:
 
             # Verify state was restored
             mock_window.setGeometry.assert_called_once_with(150, 250, 900, 700)
+
+
+class TestZoomableGraphicsViewDoubleClick:
+    """Test suite for ZoomableGraphicsView double-click functionality."""
+
+    def test_double_click_triggers_fit_action(self, qtbot):
+        """Test that double-clicking on the graphics view triggers the fit action."""
+        from dacwatch.window_manager import DiagramWindow, ZoomableGraphicsView
+        from PySide6.QtCore import Qt, QPoint
+        from PySide6.QtGui import QMouseEvent
+        from unittest.mock import Mock, patch
+        
+        # Create a real window
+        window = DiagramWindow("test.svg")
+        qtbot.addWidget(window)
+        
+        # Create test SVG content
+        svg_content = '''<svg width="200" height="200" xmlns="http://www.w3.org/2000/svg">
+            <rect x="50" y="50" width="100" height="100" fill="blue"/>
+        </svg>'''
+        
+        # Display the image to create graphics view
+        window.display_image(svg_content.encode(), "svg")
+        
+        # Verify graphics view was created
+        assert hasattr(window, 'graphics_view')
+        assert isinstance(window.graphics_view, ZoomableGraphicsView)
+        
+        # Mock the fit_to_diagram method to verify it gets called
+        with patch.object(window, 'fit_to_diagram') as mock_fit:
+            # Simulate a double-click event on the graphics view
+            graphics_view = window.graphics_view
+            
+            # Create a double-click event at the center of the view
+            click_pos = QPoint(100, 100)
+            double_click_event = QMouseEvent(
+                QMouseEvent.Type.MouseButtonDblClick,
+                click_pos,
+                Qt.MouseButton.LeftButton,
+                Qt.MouseButton.LeftButton,
+                Qt.KeyboardModifier.NoModifier
+            )
+            
+            # Send the double-click event to the graphics view
+            graphics_view.mouseDoubleClickEvent(double_click_event)
+            
+            # Verify that fit_to_diagram was called
+            mock_fit.assert_called_once()
+
+    def test_double_click_ignores_non_left_button(self, qtbot):
+        """Test that double-clicking with non-left buttons doesn't trigger fit action."""
+        from dacwatch.window_manager import DiagramWindow, ZoomableGraphicsView
+        from PySide6.QtCore import Qt, QPoint
+        from PySide6.QtGui import QMouseEvent
+        from unittest.mock import Mock, patch
+        
+        # Create a real window
+        window = DiagramWindow("test.svg")
+        qtbot.addWidget(window)
+        
+        # Create test SVG content
+        svg_content = '''<svg width="200" height="200" xmlns="http://www.w3.org/2000/svg">
+            <rect x="50" y="50" width="100" height="100" fill="red"/>
+        </svg>'''
+        
+        # Display the image to create graphics view
+        window.display_image(svg_content.encode(), "svg")
+        
+        # Mock the fit_to_diagram method to verify it's NOT called
+        with patch.object(window, 'fit_to_diagram') as mock_fit:
+            graphics_view = window.graphics_view
+            
+            # Create a right-click double-click event
+            click_pos = QPoint(100, 100)
+            right_double_click_event = QMouseEvent(
+                QMouseEvent.Type.MouseButtonDblClick,
+                click_pos,
+                Qt.MouseButton.RightButton,
+                Qt.MouseButton.RightButton,
+                Qt.KeyboardModifier.NoModifier
+            )
+            
+            # Send the right double-click event
+            graphics_view.mouseDoubleClickEvent(right_double_click_event)
+            
+            # Verify that fit_to_diagram was NOT called
+            mock_fit.assert_not_called()
+
+    def test_double_click_handles_deleted_parent_window(self, qtbot):
+        """Test that double-click gracefully handles deleted parent window."""
+        from dacwatch.window_manager import ZoomableGraphicsView
+        from PySide6.QtCore import Qt, QPoint
+        from PySide6.QtGui import QMouseEvent
+        from unittest.mock import Mock
+        
+        # Create a mock parent window that raises RuntimeError when accessed
+        mock_parent = Mock()
+        mock_parent.fit_to_diagram.side_effect = RuntimeError("Parent window deleted")
+        
+        # Create a graphics view with the mock parent
+        graphics_view = ZoomableGraphicsView(parent_window=mock_parent)
+        qtbot.addWidget(graphics_view)
+        
+        # Create a double-click event
+        click_pos = QPoint(100, 100)
+        double_click_event = QMouseEvent(
+            QMouseEvent.Type.MouseButtonDblClick,
+            click_pos,
+            Qt.MouseButton.LeftButton,
+            Qt.MouseButton.LeftButton,
+            Qt.KeyboardModifier.NoModifier
+        )
+        
+        # This should not raise an exception even though parent window is "deleted"
+        graphics_view.mouseDoubleClickEvent(double_click_event)
+        
+        # Verify that fit_to_diagram was attempted to be called
+        mock_parent.fit_to_diagram.assert_called_once()
+
+    def test_double_click_without_parent_window(self, qtbot):
+        """Test that double-click works safely when there's no parent window."""
+        from dacwatch.window_manager import ZoomableGraphicsView
+        from PySide6.QtCore import Qt, QPoint
+        from PySide6.QtGui import QMouseEvent
+        
+        # Create a graphics view without a parent window
+        graphics_view = ZoomableGraphicsView(parent_window=None)
+        qtbot.addWidget(graphics_view)
+        
+        # Create a double-click event
+        click_pos = QPoint(100, 100)
+        double_click_event = QMouseEvent(
+            QMouseEvent.Type.MouseButtonDblClick,
+            click_pos,
+            Qt.MouseButton.LeftButton,
+            Qt.MouseButton.LeftButton,
+            Qt.KeyboardModifier.NoModifier
+        )
+        
+        # This should not raise an exception even though there's no parent window
+        graphics_view.mouseDoubleClickEvent(double_click_event)
+        # Test passes if no exception is raised
