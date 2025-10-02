@@ -72,6 +72,16 @@ class AsyncEventHandler(FileSystemEventHandler):
                 'is_directory': event.is_directory
             })
 
+    def on_moved(self, event):
+        """Handle file move/rename events (e.g., atomic writes via temp files)."""
+        if not event.is_directory:
+            # Treat the destination as a created/modified file
+            self._schedule_async_task({
+                'event_type': 'created',
+                'src_path': event.dest_path,
+                'is_directory': event.is_directory
+            })
+
 
 class FileWatcher:
     """Async file watcher using watchdog with event debouncing."""
@@ -142,8 +152,6 @@ class FileWatcher:
         # Only process supported file types
         if not is_supported_file(file_path):
             return
-
-
 
         # Add to queue for debounced processing
         await self.event_queue.put(event)
