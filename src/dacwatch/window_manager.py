@@ -754,7 +754,11 @@ class DiagramWindow(QMainWindow):
         # Copy image (Cmd+C)
         copy_image_shortcut = QShortcut(QKeySequence.StandardKey.Copy, self)
         copy_image_shortcut.activated.connect(self.copy_image_to_clipboard)
-        
+
+        # Copy image with white background (Cmd+Option+C)
+        copy_white_bg_shortcut = QShortcut(QKeySequence("Ctrl+Alt+C"), self)
+        copy_white_bg_shortcut.activated.connect(self.copy_image_with_white_background)
+
         # Copy source (Cmd+Shift+C)
         copy_source_shortcut = QShortcut(QKeySequence("Ctrl+Shift+C"), self)
         copy_source_shortcut.activated.connect(self.copy_source_to_clipboard)
@@ -810,10 +814,51 @@ class DiagramWindow(QMainWindow):
             # Copy to clipboard
             clipboard = QApplication.clipboard()
             clipboard.setImage(image)
-            
+
             # Show toast notification
             if hasattr(self, 'toast') and self.toast:
                 self.toast.show_toast("Copied image")
+        except (RuntimeError, AttributeError):
+            # Pixmap item or toast might have been deleted
+            pass
+
+    def copy_image_with_white_background(self):
+        """Copy the current image to clipboard with white background instead of transparent."""
+        if not hasattr(self, 'pixmap_item') or self.pixmap_item is None:
+            return
+
+        try:
+            from PySide6.QtWidgets import QApplication
+            from PySide6.QtGui import QImage, QPainter
+            from PySide6.QtCore import Qt
+
+            # Get pixmap from the graphics item
+            pixmap = self.pixmap_item.pixmap()
+
+            # Get device pixel ratio to handle high-DPI displays correctly
+            device_pixel_ratio = pixmap.devicePixelRatio()
+
+            # Get actual pixel dimensions (physical size)
+            width = pixmap.width()
+            height = pixmap.height()
+
+            # Create a new image with white background at the same physical size
+            image = QImage(width, height, QImage.Format.Format_ARGB32)
+            image.setDevicePixelRatio(device_pixel_ratio)
+            image.fill(Qt.GlobalColor.white)
+
+            # Draw the original pixmap on top of the white background
+            painter = QPainter(image)
+            painter.drawPixmap(0, 0, pixmap)
+            painter.end()
+
+            # Copy to clipboard
+            clipboard = QApplication.clipboard()
+            clipboard.setImage(image)
+
+            # Show toast notification
+            if hasattr(self, 'toast') and self.toast:
+                self.toast.show_toast("Copied with white background")
         except (RuntimeError, AttributeError):
             # Pixmap item or toast might have been deleted
             pass
