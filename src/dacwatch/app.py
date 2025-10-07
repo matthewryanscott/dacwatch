@@ -42,9 +42,37 @@ class DaCWatchApp:
         # Initialize the Kroki client
         self.kroki_client = KrokiClient(self.config.kroki_base)
 
+        # Setup application-level keyboard shortcuts
+        self._setup_app_shortcuts()
+
         # Start the file watcher
         self.file_watcher = FileWatcher(self.config, self._handle_file_event)
         await self.file_watcher.start()
+
+    def _setup_app_shortcuts(self):
+        """Setup application-level keyboard shortcuts."""
+        from PySide6.QtGui import QShortcut, QKeySequence
+        from PySide6.QtCore import Qt
+
+        # Get the QApplication instance
+        app = QApplication.instance()
+        if not app:
+            return
+
+        # Cycle windows forward (Cmd+Shift+] / Cmd+})
+        cycle_forward = QShortcut(QKeySequence("Ctrl+Shift+]"), app)
+        cycle_forward.setContext(Qt.ShortcutContext.ApplicationShortcut)
+        cycle_forward.activated.connect(lambda: self._cycle_windows(False))
+
+        # Cycle windows backward (Cmd+Shift+[ / Cmd+{)
+        cycle_backward = QShortcut(QKeySequence("Ctrl+Shift+["), app)
+        cycle_backward.setContext(Qt.ShortcutContext.ApplicationShortcut)
+        cycle_backward.activated.connect(lambda: self._cycle_windows(True))
+
+    def _cycle_windows(self, backward=False):
+        """Cycle through windows."""
+        if self.window_manager:
+            self.window_manager.cycle_to_next_window(backward=backward)
 
     async def stop(self):
         """Stop the application."""

@@ -227,9 +227,10 @@ class ZoomableGraphicsView(QGraphicsView):
 class DiagramWindow(QMainWindow):
     """A window for displaying diagram files."""
 
-    def __init__(self, file_path: str):
+    def __init__(self, file_path: str, window_manager: Optional['WindowManager'] = None):
         super().__init__()
         self.file_path = file_path
+        self.window_manager = window_manager
         self.loading_label: Optional[QLabel] = None
         self.format_label: Optional[QLabel] = None
         self.format_toggle_callback: Optional[Callable[[str], None]] = None
@@ -779,6 +780,9 @@ class DiagramWindow(QMainWindow):
         fit_shortcut = QShortcut(QKeySequence("F"), self)
         fit_shortcut.activated.connect(self.fit_to_diagram)
 
+        # Note: Window cycling shortcuts (Cmd+] and Cmd+[) are registered at the
+        # application level in app.py to ensure they work across all windows
+
     def toggle_format(self):
         """Toggle between SVG and PNG formats using radio buttons."""
         if not hasattr(self, 'image_data') or self.image_data is None:
@@ -1108,6 +1112,40 @@ class WindowManager:
         """
         return list(self.windows.keys())
 
+    def cycle_to_next_window(self, backward=False):
+        """Cycle to the next/previous window in the list of open windows."""
+        if len(self.windows) <= 1:
+            return  # Nothing to cycle if 0 or 1 windows
+
+        from PySide6.QtWidgets import QApplication
+
+        # Get currently active window
+        active_window = QApplication.activeWindow()
+
+        # Get list of windows in a consistent order
+        window_list = list(self.windows.values())
+
+        # Find current window index
+        try:
+            current_index = window_list.index(active_window)
+            if backward:
+                next_index = (current_index - 1) % len(window_list)
+            else:
+                next_index = (current_index + 1) % len(window_list)
+        except (ValueError, AttributeError):
+            # Active window not in our list or no active window, just use first
+            next_index = 0
+
+        # Activate next window
+        next_window = window_list[next_index]
+        if next_window:
+            try:
+                next_window.raise_()
+                next_window.activateWindow()
+            except (RuntimeError, AttributeError):
+                # Window might have been deleted
+                pass
+
     def close_all_windows(self):
         """Close all open windows."""
         for file_path in list(self.windows.keys()):
@@ -1219,4 +1257,4 @@ class WindowManager:
         Returns:
             A DiagramWindow instance for the diagram
         """
-        return DiagramWindow(file_path)
+        return DiagramWindow(file_path, window_manager=self)
