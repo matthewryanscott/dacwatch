@@ -208,15 +208,18 @@ class FileWatcher:
 
     def _flatten_events(self, event_types: Set[str]) -> Optional[str]:
         """Flatten multiple event types into a single meaningful event."""
-        if 'deleted' in event_types:
-            # If file was deleted, that's the final event regardless of others
-            return 'deleted'
+        # If file was deleted then created, treat as created (file replacement)
+        if 'deleted' in event_types and 'created' in event_types:
+            return 'created'
         elif 'created' in event_types:
             # If file was created (and possibly modified), treat as created
             return 'created'
         elif 'modified' in event_types:
             # Only modified events
             return 'modified'
+        elif 'deleted' in event_types:
+            # Only deleted event (no creation after)
+            return 'deleted'
         else:
             # No valid events
             return None
