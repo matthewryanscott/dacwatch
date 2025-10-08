@@ -199,26 +199,36 @@ class FileWatcher:
 
         # Process all pending events
         for file_path, event_types in self.pending_events.items():
-            flattened_event = self._flatten_events(event_types)
+            flattened_event = self._flatten_events(event_types, file_path)
             if flattened_event:
                 await self._process_single_event(flattened_event, file_path)
 
         # Clear pending events
         self.pending_events.clear()
 
-    def _flatten_events(self, event_types: Set[str]) -> Optional[str]:
-        """Flatten multiple event types into a single meaningful event."""
-        # If file was deleted then created, treat as created (file replacement)
-        if 'deleted' in event_types and 'created' in event_types:
-            return 'created'
-        elif 'created' in event_types:
-            # If file was created (and possibly modified), treat as created
-            return 'created'
+    def _flatten_events(self, event_types: Set[str], file_path: str) -> Optional[str]:
+        """
+        Flatten multiple event types into a single meaningful event.
+
+        Uses file existence to determine actual state rather than relying on event order.
+        """
+        file_exists = Path(file_path).exists()
+
+        # If we have created or modified events and file exists, prioritize that
+        if 'created' in event_types:
+            if file_exists:
+                return 'created'
+            else:
+                # Created then deleted - file is gone
+                return 'deleted'
         elif 'modified' in event_types:
-            # Only modified events
-            return 'modified'
+            if file_exists:
+                return 'modified'
+            else:
+                # Modified then deleted - file is gone
+                return 'deleted'
         elif 'deleted' in event_types:
-            # Only deleted event (no creation after)
+            # Only deletion events
             return 'deleted'
         else:
             # No valid events

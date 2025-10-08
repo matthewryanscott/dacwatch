@@ -97,8 +97,10 @@ async def test_qapplication_initialization_existing_instance(tmp_path):
     config = Config(directory=directory)
 
     with patch('dacwatch.app.QApplication') as mock_qapp_class:
-        mock_existing_instance = MagicMock()
-        mock_qapp_class.instance.return_value = mock_existing_instance
+        from PySide6.QtWidgets import QApplication
+        # Use real QApplication instance for proper Qt type checking
+        real_qapp = QApplication.instance()
+        mock_qapp_class.instance.return_value = real_qapp
 
         app = DaCWatchApp(config)
         await app.start()

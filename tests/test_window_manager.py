@@ -200,7 +200,7 @@ class TestWindowFactory:
             result = manager._create_window("/path/to/test/file.dot")
 
             # Verify DiagramWindow was created correctly
-            mock_diagram_window.assert_called_once_with("/path/to/test/file.dot")
+            mock_diagram_window.assert_called_once_with("/path/to/test/file.dot", window_manager=manager)
 
             # Verify the result
             assert result == mock_window_instance
@@ -245,7 +245,7 @@ class TestWindowFactory:
 
                 result = manager._create_window(file_path)
 
-                mock_diagram_window.assert_called_with(file_path)
+                mock_diagram_window.assert_called_with(file_path, window_manager=manager)
                 assert result.file_path == file_path
 
 

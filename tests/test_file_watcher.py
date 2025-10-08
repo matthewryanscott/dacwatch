@@ -412,27 +412,35 @@ async def test_file_watcher_event_flattening_created_deleted(tmp_path):
     # The test passes if no exceptions are raised
 
 
-def test_file_watcher_flatten_events_method():
-    """Test the _flatten_events method directly."""
+def test_file_watcher_flatten_events_method(tmp_path):
+    """Test the _flatten_events method directly with file existence checks."""
     from dacwatch.file_watcher import FileWatcher
     from dacwatch.config import Config
-    from pathlib import Path
 
-    # Create a temporary config for the test
-    tmp_path = Path("/tmp")
     config = Config(directory=tmp_path)
     watcher = FileWatcher(config)
 
-    # Test various event combinations
-    assert watcher._flatten_events({'created'}) == 'created'
-    assert watcher._flatten_events({'modified'}) == 'modified'
-    assert watcher._flatten_events({'deleted'}) == 'deleted'
+    # Create a test file that exists
+    existing_file = tmp_path / "existing.dot"
+    existing_file.write_text("graph { a -- b }")
 
-    assert watcher._flatten_events({'created', 'modified'}) == 'created'
-    assert watcher._flatten_events({'modified', 'deleted'}) == 'deleted'
-    assert watcher._flatten_events({'created', 'deleted'}) == 'deleted'
+    # File that doesn't exist
+    deleted_file = tmp_path / "deleted.dot"
 
-    assert watcher._flatten_events({'created', 'modified', 'deleted'}) == 'deleted'
+    # Test events for existing files
+    assert watcher._flatten_events({'created'}, str(existing_file)) == 'created'
+    assert watcher._flatten_events({'modified'}, str(existing_file)) == 'modified'
+    assert watcher._flatten_events({'created', 'modified'}, str(existing_file)) == 'created'
+
+    # Test delete+create with file existing (file replacement)
+    assert watcher._flatten_events({'created', 'deleted'}, str(existing_file)) == 'created'
+    assert watcher._flatten_events({'created', 'modified', 'deleted'}, str(existing_file)) == 'created'
+
+    # Test events for non-existing files (all result in deleted)
+    assert watcher._flatten_events({'deleted'}, str(deleted_file)) == 'deleted'
+    assert watcher._flatten_events({'modified', 'deleted'}, str(deleted_file)) == 'deleted'
+    assert watcher._flatten_events({'created', 'deleted'}, str(deleted_file)) == 'deleted'
+    assert watcher._flatten_events({'created', 'modified', 'deleted'}, str(deleted_file)) == 'deleted'
 
     # Test empty set
-    assert watcher._flatten_events(set()) is None
+    assert watcher._flatten_events(set(), str(existing_file)) is None

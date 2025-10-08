@@ -28,7 +28,7 @@ def test_config_default_kroki_base(tmp_path):
     config = Config(directory=directory)
 
     assert config.directory == directory
-    assert config.kroki_base == "https://kroki.io"
+    assert config.kroki_base == "http://localhost:48000"
 
 
 def test_config_validation_directory_exists():
