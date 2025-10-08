@@ -891,10 +891,21 @@ class DiagramWindow(QMainWindow):
             clipboard.setText(self.full_error_text)
 
     def reveal_in_finder(self):
-        """Reveal the file in Finder (macOS)."""
+        """Reveal the file in Finder (macOS) or file manager (Linux/Windows)."""
         import subprocess
+        import sys
+        import os
         try:
-            subprocess.run(['open', '-R', self.file_path])
+            if sys.platform == 'darwin':
+                # macOS: open -R reveals in Finder
+                subprocess.run(['open', '-R', self.file_path])
+            elif sys.platform.startswith('linux'):
+                # Linux: xdg-open the parent directory
+                parent_dir = os.path.dirname(os.path.abspath(self.file_path))
+                subprocess.run(['xdg-open', parent_dir])
+            elif sys.platform == 'win32':
+                # Windows: explorer /select reveals in Explorer
+                subprocess.run(['explorer', '/select,', self.file_path])
         except (subprocess.SubprocessError, OSError):
             # If subprocess fails, just continue
             pass
@@ -1025,6 +1036,13 @@ class DiagramWindow(QMainWindow):
                     pass
             QTimer.singleShot(50, safe_set_focus)
 
+    def closeEvent(self, event):
+        """Handle window close event to clean up from window manager."""
+        super().closeEvent(event)
+        # Notify window manager to remove this window from its tracking
+        if self.window_manager:
+            self.window_manager.remove_window_by_path(self.file_path)
+
 
 class WindowManager:
     """Manages the mapping between files and their corresponding windows."""
@@ -1082,6 +1100,21 @@ class WindowManager:
             # Save window state before closing
             self.save_window_state(file_path)
             window.close()
+            del self.windows[file_path]
+
+            # Persist state to disk
+            self.persist_state()
+
+    def remove_window_by_path(self, file_path: str):
+        """
+        Remove a window from tracking (called when window is closed manually).
+
+        Args:
+            file_path: Path to the file
+        """
+        if file_path in self.windows:
+            # Save window state before removing
+            self.save_window_state(file_path)
             del self.windows[file_path]
 
             # Persist state to disk
