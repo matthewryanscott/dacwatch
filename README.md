@@ -19,8 +19,8 @@
 ### User Interface
 - Toolbar with format toggle, copy, and file management buttons
 - Format indicator showing current SVG/PNG mode
-- Command-W (⌘W) keyboard shortcut to close windows
-- Native macOS integration with "Reveal in Finder" support
+- Cross-platform keyboard shortcuts (Cmd on macOS, Ctrl on Linux/Windows)
+- Native file manager integration with "Reveal" support
 
 ### Clipboard Integration
 - Copy rendered image to clipboard with high-DPI metadata preservation
@@ -29,7 +29,7 @@
 
 ## Architecture
 
-- **Platform**: MacOS with high-DPI display support
+- **Platform**: Cross-platform (macOS, Linux, Windows) with high-DPI display support
 - **Python**: 3.13 (via uv package manager)
 - **Async Runtime**: Async Python with qasync Qt integration
 - **GUI Framework**: PySide6 with traditional QWidget (not QML or Qt Quick)
@@ -67,33 +67,31 @@ uv run dacwatch --kroki-base=https://kroki.io <dir> [<dir2> ...]
 ### Keyboard Shortcuts
 
 #### Window Management
-- **Command-W (⌘W)**: Close the active diagram window
-- **Command-Shift-] (⌘⇧])**: Cycle to next window
-- **Command-Shift-[ (⌘⇧[)**: Cycle to previous window
-- **Command-T (⌘T)**: Toggle always-on-top mode
-- **Command-R (⌘R)**: Reveal file in Finder
+- **Cmd-W / Ctrl-W**: Close the active diagram window
+- **Cmd-Shift-] / Ctrl-Shift-]**: Cycle to next window
+- **Cmd-Shift-[ / Ctrl-Shift-[**: Cycle to previous window
+- **Cmd-T / Ctrl-T**: Toggle always-on-top mode
+- **Cmd-R / Ctrl-R**: Reveal file in file manager
 
 #### Viewing & Navigation
-- **Command-+ (⌘+)**: Zoom in
-- **Command-- (⌘-)**: Zoom out
-- **Command-0 (⌘0)**: Reset zoom to 100%
+- **Cmd-+ / Ctrl-+**: Zoom in
+- **Cmd-- / Ctrl--**: Zoom out
+- **Cmd-0 / Ctrl-0**: Reset zoom to 100%
 - **F**: Fit window to diagram size
 - **Double-click**: Fit window to diagram size
 - **Pinch gesture**: Zoom in/out (trackpad)
 
 #### Clipboard Operations
-- **Command-C (⌘C)**: Copy rendered image to clipboard
-- **Command-Option-C (⌘⌥C)**: Copy image with white background
-- **Command-Shift-C (⌘⇧C)**: Copy diagram source code
+- **Cmd-C / Ctrl-C**: Copy rendered image to clipboard
+- **Cmd-Option-C / Ctrl-Alt-C**: Copy image with white background
+- **Cmd-Shift-C / Ctrl-Shift-C**: Copy diagram source code
 
 #### Format Control
-- **Command-F (⌘F)**: Toggle between SVG and PNG rendering
-
-> **Note**: On Windows/Linux, use **Ctrl** instead of **Command (⌘)**
+- **Cmd-F / Ctrl-F**: Toggle between SVG and PNG rendering
 
 ### Toolbar Actions
 
 - **Toggle SVG/PNG**: Switch between SVG and PNG rendering formats
 - **Copy Image**: Copy the current high-DPI rendered image to clipboard
-- **Copy Source**: Copy the diagram source code to clipboard  
-- **Reveal in Finder**: Open the source file location in Finder (macOS)
+- **Copy Source**: Copy the diagram source code to clipboard
+- **Reveal**: Open the source file location in file manager
