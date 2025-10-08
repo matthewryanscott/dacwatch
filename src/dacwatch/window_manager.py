@@ -245,8 +245,10 @@ class DiagramWindow(QMainWindow):
         file_name = Path(self.file_path).name
         self.setWindowTitle(f"DaCWatch - {file_name}")
 
-        # Set window flags to stay on top without stealing focus
-        self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
+        # Set window flags to stay on top (macOS only - Linux has window visibility issues)
+        import sys
+        if sys.platform == 'darwin':
+            self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
 
         # Set window geometry (position and size)
         self.setGeometry(100, 100, 800, 600)
@@ -615,8 +617,10 @@ class DiagramWindow(QMainWindow):
         self.reveal_button.clicked.connect(self.reveal_in_finder)
         toolbar.addWidget(self.reveal_button)
 
-        # Always on top toggle - using action for cleaner state management
-        toolbar.addAction(self.always_on_top_action)
+        # Always on top toggle - macOS only (Linux has issues with window disappearing)
+        import sys
+        if sys.platform == 'darwin':
+            toolbar.addAction(self.always_on_top_action)
 
         # Create format selection radio buttons
         from PySide6.QtWidgets import QLabel, QRadioButton, QHBoxLayout, QWidget, QButtonGroup
@@ -767,10 +771,12 @@ class DiagramWindow(QMainWindow):
         # Toggle format (Cmd+F)
         toggle_format_shortcut = QShortcut(QKeySequence("Ctrl+F"), self)
         toggle_format_shortcut.activated.connect(self.toggle_format)
-        
-        # Toggle always on top (Cmd+T)
-        toggle_always_on_top_shortcut = QShortcut(QKeySequence("Ctrl+T"), self)
-        toggle_always_on_top_shortcut.activated.connect(lambda: self.always_on_top_action.trigger())
+
+        # Toggle always on top (Cmd+T on Mac only - disabled on Linux due to window visibility issues)
+        import sys
+        if sys.platform == 'darwin':
+            toggle_always_on_top_shortcut = QShortcut(QKeySequence("Ctrl+T"), self)
+            toggle_always_on_top_shortcut.activated.connect(lambda: self.always_on_top_action.trigger())
         
         # Reveal in Finder (Cmd+R on Mac, Ctrl+R on others)
         reveal_finder_shortcut = QShortcut(QKeySequence("Ctrl+R"), self)
