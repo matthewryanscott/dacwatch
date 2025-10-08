@@ -47,7 +47,30 @@ uv run dacwatch --kroki-base=https://kroki.io <dir> [<dir2> ...]
 
 ### Keyboard Shortcuts
 
-- **Command-W (⌘W)**: Close the active diagram window (Ctrl-W on Windows/Linux)
+#### Window Management
+- **Command-W (⌘W)**: Close the active diagram window
+- **Command-Shift-] (⌘⇧])**: Cycle to next window
+- **Command-Shift-[ (⌘⇧[)**: Cycle to previous window
+- **Command-T (⌘T)**: Toggle always-on-top mode
+- **Command-R (⌘R)**: Reveal file in Finder
+
+#### Viewing & Navigation
+- **Command-+ (⌘+)**: Zoom in
+- **Command-- (⌘-)**: Zoom out
+- **Command-0 (⌘0)**: Reset zoom to 100%
+- **F**: Fit window to diagram size
+- **Double-click**: Fit window to diagram size
+- **Pinch gesture**: Zoom in/out (trackpad)
+
+#### Clipboard Operations
+- **Command-C (⌘C)**: Copy rendered image to clipboard
+- **Command-Option-C (⌘⌥C)**: Copy image with white background
+- **Command-Shift-C (⌘⇧C)**: Copy diagram source code
+
+#### Format Control
+- **Command-F (⌘F)**: Toggle between SVG and PNG rendering
+
+> **Note**: On Windows/Linux, use **Ctrl** instead of **Command (⌘)**
 
 ### Toolbar Actions
 
