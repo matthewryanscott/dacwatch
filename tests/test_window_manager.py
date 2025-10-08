@@ -867,26 +867,26 @@ class TestDiagramWindowToolbar:
         window = DiagramWindow("test.svg")
         qtbot.addWidget(window)
         
-        # Initially should be always on top (default state)
+        # Initially should NOT be always on top (default state)
         initial_flags = window.windowFlags()
-        assert bool(initial_flags & Qt.WindowType.WindowStaysOnTopHint)  # Should be on top by default
-        assert window.always_on_top_action.isChecked()  # Action should be checked
-        
-        # Toggle off with keyboard shortcut (trigger action)
-        window.always_on_top_action.trigger()
-        
-        # Should now be off
-        new_flags = window.windowFlags()
-        assert not bool(new_flags & Qt.WindowType.WindowStaysOnTopHint)  # Should not be on top
+        assert not bool(initial_flags & Qt.WindowType.WindowStaysOnTopHint)  # Should NOT be on top by default
         assert not window.always_on_top_action.isChecked()  # Action should be unchecked
         
-        # Toggle back on with keyboard shortcut (trigger action again)
+        # Toggle on with keyboard shortcut (trigger action)
         window.always_on_top_action.trigger()
-        
-        # Should be back on
+
+        # Should now be on
+        new_flags = window.windowFlags()
+        assert bool(new_flags & Qt.WindowType.WindowStaysOnTopHint)  # Should be on top
+        assert window.always_on_top_action.isChecked()  # Action should be checked
+
+        # Toggle back off with keyboard shortcut (trigger action again)
+        window.always_on_top_action.trigger()
+
+        # Should be back off
         final_flags = window.windowFlags()
-        assert bool(final_flags & Qt.WindowType.WindowStaysOnTopHint)  # Should be on top again
-        assert window.always_on_top_action.isChecked()  # Action should be checked again
+        assert not bool(final_flags & Qt.WindowType.WindowStaysOnTopHint)  # Should not be on top again
+        assert not window.always_on_top_action.isChecked()  # Action should be unchecked again
 
     def test_keyboard_focus_on_graphics_view(self, qtbot):
         """Test that keyboard focus is set to graphics view when window is shown."""

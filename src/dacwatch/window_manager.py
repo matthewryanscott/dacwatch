@@ -245,10 +245,8 @@ class DiagramWindow(QMainWindow):
         file_name = Path(self.file_path).name
         self.setWindowTitle(f"DaCWatch - {file_name}")
 
-        # Set window flags to stay on top (macOS only - Linux has window visibility issues)
-        import sys
-        if sys.platform == 'darwin':
-            self.setWindowFlags(self.windowFlags() | Qt.WindowType.WindowStaysOnTopHint)
+        # Window stays on top controlled by action (macOS only - Linux has window visibility issues)
+        # Initial state set to False in _setup_actions()
 
         # Set window geometry (position and size)
         self.setGeometry(100, 100, 800, 600)
@@ -705,7 +703,7 @@ class DiagramWindow(QMainWindow):
         # Always on top action - checkable for clean state management
         self.always_on_top_action = QAction("Always on top", self)
         self.always_on_top_action.setCheckable(True)
-        self.always_on_top_action.setChecked(True)  # Default to on
+        self.always_on_top_action.setChecked(False)  # Default to off
         self.always_on_top_action.triggered.connect(self._handle_always_on_top)
 
     def _handle_always_on_top(self, checked: bool):
