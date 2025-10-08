@@ -39,6 +39,7 @@ def main(
     import signal
     import sys
     from PySide6.QtWidgets import QApplication
+    from PySide6.QtCore import QTimer
 
     # Create Qt application in main thread
     if QApplication.instance() is None:
@@ -58,10 +59,21 @@ def main(
     # Set up signal handler for graceful shutdown
     def signal_handler(signum, frame):
         print("\nReceived interrupt signal, shutting down...")
+        # Schedule cleanup on the event loop instead of exiting immediately
+        loop.create_task(shutdown())
+
+    async def shutdown():
+        """Async shutdown handler to cleanup properly."""
+        await dac_app.stop()
         qt_app.quit()
-        sys.exit(0)
 
     signal.signal(signal.SIGINT, signal_handler)
+
+    # Install a timer to allow Python to process signals
+    # Qt's event loop blocks signal handling, so we need to wake it up periodically
+    signal_timer = QTimer()
+    signal_timer.timeout.connect(lambda: None)  # Do nothing, just wake up the event loop
+    signal_timer.start(250)  # Check every 250ms
 
     # Create the asyncio event loop using qasync
     loop = qasync.QEventLoop(qt_app)
@@ -83,11 +95,16 @@ def main(
 
     except KeyboardInterrupt:
         typer.echo("Received interrupt signal, shutting down...")
-        qt_app.quit()
     finally:
-        # Clean up
-        if not loop.is_closed():
-            loop.create_task(dac_app.stop())
+        # Clean up - make sure all tasks are complete
+        pending = asyncio.all_tasks(loop)
+        for task in pending:
+            task.cancel()
+
+        # Wait for all tasks to be cancelled
+        if pending:
+            loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+
         loop.close()
 
 
