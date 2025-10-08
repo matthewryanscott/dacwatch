@@ -8,7 +8,7 @@ class Config:
     """Configuration for DaCWatch application."""
 
     directory: Path
-    kroki_base: str = "https://kroki.io"
+    kroki_base: str = "http://localhost:48000"
 
     def __post_init__(self):
         """Validate configuration after initialization."""
@@ -32,6 +32,6 @@ class Config:
             raise ValueError(f"Invalid kroki_base URL: {self.kroki_base}") from e
 
     @classmethod
-    def from_cli_args(cls, directory: Path, kroki_base: str = "https://kroki.io") -> "Config":
+    def from_cli_args(cls, directory: Path, kroki_base: str = "http://localhost:48000") -> "Config":
         """Create Config from CLI arguments."""
         return cls(directory=directory, kroki_base=kroki_base)

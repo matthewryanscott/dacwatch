@@ -10,7 +10,7 @@ app = typer.Typer(name="dacwatch", help="DaCWatch - Diagram as Code File Watcher
 @app.command(name="dacwatch")
 def main(
     directory: Path = typer.Argument(..., help="Directory to watch for diagram files"),
-    kroki_base: str = typer.Option("https://kroki.io", help="Kroki service base URL"),
+    kroki_base: str = typer.Option("http://localhost:48000", help="Kroki service base URL"),
     dry_run: bool = typer.Option(False, help="Dry run - validate config and exit"),
 ):
     """

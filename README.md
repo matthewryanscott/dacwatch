@@ -41,6 +41,25 @@
 
 ## Usage
 
+### Recommended: Self-hosted Kroki (Docker)
+
+For best privacy and performance, run your own Kroki instance using the included Docker Compose setup:
+
+```bash
+# Start the self-hosted Kroki service (runs on localhost:48000)
+cd kroki-self-hosted
+docker compose up -d
+
+# Run DaCWatch (uses localhost:48000 by default)
+uv run dacwatch <dir> [<dir2> ...]
+```
+
+### Alternative: Public Kroki Service
+
+⚠️ **Privacy Warning**: Using the public Kroki service sends your diagram source code to a third-party server.
+
+If you prefer not to run Docker, you can use the public Kroki endpoint:
+
 ```bash
 uv run dacwatch --kroki-base=https://kroki.io <dir> [<dir2> ...]
 ```

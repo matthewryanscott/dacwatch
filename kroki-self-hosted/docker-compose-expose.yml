@@ -1,0 +1,16 @@
+services:
+  kroki:
+    ports:
+      - "48000:8000"
+  niolesk:
+    ports:
+      - "48080:80"
+  mermaid:
+    expose:
+      - "8002"
+  bpmn:
+    expose:
+      - "8003"
+  excalidraw:
+    expose:
+      - "8004"

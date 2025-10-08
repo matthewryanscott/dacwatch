@@ -1,0 +1,39 @@
+services:
+  kroki:
+    image: yuzutech/kroki:0.28.0
+    ports:
+      - "48000:8000"
+    depends_on:
+      - mermaid
+      - bpmn
+      - excalidraw
+    restart: unless-stopped
+    environment:
+      - KROKI_MERMAID_HOST=mermaid
+      - KROKI_BPMN_HOST=bpmn
+      - KROKI_EXCALIDRAW_HOST=excalidraw
+  mermaid:
+    restart: unless-stopped
+    image: yuzutech/kroki-mermaid:0.28.0
+    expose:
+      - "8002"
+  bpmn:
+    restart: unless-stopped
+    image: yuzutech/kroki-bpmn:0.28.0
+    expose:
+      - "8003"
+  excalidraw:
+    restart: unless-stopped
+    image: yuzutech/kroki-excalidraw:0.28.0
+    expose:
+      - "8004"
+  niolesk:
+    image: ghcr.io/webgiss/niolesk:main-b94db96
+    ports:
+      - "48080:80"
+    depends_on:
+      - kroki
+    hostname: niolesk
+    restart: unless-stopped
+    environment:
+      - NIOLESK_KROKI_ENGINE=${NIOLESK_KROKI_ENGINE:-http://localhost:48000/}
