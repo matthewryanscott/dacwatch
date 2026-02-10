@@ -156,3 +156,201 @@ async def test_qapplication_cleanup_on_stop(tmp_path):
         # Verify app state is cleaned up
         assert app.is_running is False
         # Note: qt_app should still be set after stop for potential reuse
+
+
+@pytest.mark.asyncio
+async def test_handle_markdown_event_created(tmp_path):
+    """Test that markdown file creates windows for each diagram block."""
+    directory = tmp_path / "test_dir"
+    directory.mkdir()
+    config = Config(directory=directory)
+
+    # Create a markdown file with two diagram blocks
+    md_file = directory / "test.md"
+    md_file.write_text(
+        "# Doc\n\n"
+        "```plantuml\n@startuml\nA -> B\n@enduml\n```\n\n"
+        "```mermaid\ngraph TD\n  A --> B\n```\n"
+    )
+
+    app = DaCWatchApp(config)
+    await app.start()
+
+    # Mock kroki client to return fake image data
+    mock_kroki = MagicMock()
+
+    async def fake_render(source, dtype, fmt="svg"):
+        return b'<svg>test</svg>'
+
+    mock_kroki.render_diagram = fake_render
+    app.kroki_client = mock_kroki
+
+    # Mock window manager
+    mock_wm = MagicMock()
+    mock_window = MagicMock()
+    mock_wm.get_or_create_window.return_value = mock_window
+    app.window_manager = mock_wm
+
+    await app._handle_file_event('created', str(md_file))
+
+    # Should have called get_or_create_window for each diagram block
+    assert mock_wm.get_or_create_window.call_count == 2
+
+    # Check first call
+    first_call = mock_wm.get_or_create_window.call_args_list[0]
+    assert first_call[0][0] == f"{md_file}:0"
+    assert first_call[1]['actual_file_path'] == str(md_file)
+
+    # Check second call
+    second_call = mock_wm.get_or_create_window.call_args_list[1]
+    assert second_call[0][0] == f"{md_file}:1"
+
+    # Cleanup stale windows should have been called
+    mock_wm.cleanup_stale_markdown_windows.assert_called_once_with(str(md_file), 2)
+
+    await app.stop()
+
+
+@pytest.mark.asyncio
+async def test_handle_markdown_event_deleted(tmp_path):
+    """Test that deleting a markdown file closes all its windows."""
+    directory = tmp_path / "test_dir"
+    directory.mkdir()
+    config = Config(directory=directory)
+
+    app = DaCWatchApp(config)
+    await app.start()
+
+    # Mock window manager
+    mock_wm = MagicMock()
+    app.window_manager = mock_wm
+    app.kroki_client = MagicMock()
+
+    md_path = str(directory / "test.md")
+    await app._handle_file_event('deleted', md_path)
+
+    mock_wm.cleanup_markdown_windows.assert_called_once_with(md_path)
+
+    await app.stop()
+
+
+@pytest.mark.asyncio
+async def test_handle_diagram_event_still_works(tmp_path):
+    """Test that regular diagram files still work after markdown changes."""
+    directory = tmp_path / "test_dir"
+    directory.mkdir()
+    config = Config(directory=directory)
+
+    dot_file = directory / "test.dot"
+    dot_file.write_text("digraph G { A -> B; }")
+
+    app = DaCWatchApp(config)
+    await app.start()
+
+    # Mock kroki client
+    mock_kroki = MagicMock()
+
+    async def fake_render(source, dtype, fmt="svg"):
+        return b'<svg>test</svg>'
+
+    mock_kroki.render_diagram = fake_render
+    mock_kroki.get_diagram_type.return_value = "graphviz"
+    app.kroki_client = mock_kroki
+
+    # Mock window manager
+    mock_wm = MagicMock()
+    mock_window = MagicMock()
+    mock_wm.get_or_create_window.return_value = mock_window
+    app.window_manager = mock_wm
+
+    await app._handle_file_event('created', str(dot_file))
+
+    # Should use regular get_or_create_window (no actual_file_path)
+    mock_wm.get_or_create_window.assert_called_once_with(str(dot_file))
+
+    await app.stop()
+
+
+@pytest.mark.asyncio
+async def test_handle_markdown_no_diagram_blocks(tmp_path):
+    """Test markdown file with no diagram blocks creates no windows."""
+    directory = tmp_path / "test_dir"
+    directory.mkdir()
+    config = Config(directory=directory)
+
+    md_file = directory / "test.md"
+    md_file.write_text(
+        "# Just text\n\n"
+        "```python\nprint('hello')\n```\n"
+    )
+
+    app = DaCWatchApp(config)
+    await app.start()
+
+    mock_wm = MagicMock()
+    app.window_manager = mock_wm
+    app.kroki_client = MagicMock()
+
+    await app._handle_file_event('created', str(md_file))
+
+    mock_wm.get_or_create_window.assert_not_called()
+    mock_wm.cleanup_stale_markdown_windows.assert_called_once_with(str(md_file), 0)
+
+    await app.stop()
+
+
+@pytest.mark.asyncio
+async def test_render_markdown_block_format_toggle(tmp_path):
+    """Test format toggle for markdown diagram block."""
+    directory = tmp_path / "test_dir"
+    directory.mkdir()
+    config = Config(directory=directory)
+
+    md_file = directory / "test.md"
+    md_file.write_text(
+        "```plantuml\n@startuml\nA -> B\n@enduml\n```\n"
+    )
+
+    app = DaCWatchApp(config)
+    await app.start()
+
+    mock_kroki = MagicMock()
+
+    async def fake_render(source, dtype, fmt="svg"):
+        return b'<svg>png</svg>'
+
+    mock_kroki.render_diagram = fake_render
+    app.kroki_client = mock_kroki
+
+    mock_window = MagicMock()
+
+    await app._render_markdown_block(str(md_file), 0, mock_window, "png")
+
+    # Window should have display_image called
+    mock_window.display_image.assert_called_once()
+    assert mock_window.source_code == "@startuml\nA -> B\n@enduml\n"
+
+    await app.stop()
+
+
+@pytest.mark.asyncio
+async def test_render_markdown_block_removed(tmp_path):
+    """Test format toggle when block has been removed."""
+    directory = tmp_path / "test_dir"
+    directory.mkdir()
+    config = Config(directory=directory)
+
+    md_file = directory / "test.md"
+    md_file.write_text("# No diagrams\n")
+
+    app = DaCWatchApp(config)
+    await app.start()
+    app.kroki_client = MagicMock()
+
+    mock_window = MagicMock()
+
+    await app._render_markdown_block(str(md_file), 0, mock_window, "svg")
+
+    mock_window.display_error.assert_called_once()
+
+    await app.stop()

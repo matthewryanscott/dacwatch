@@ -1,6 +1,8 @@
 from pathlib import Path
 from typing import Optional
 
+from .markdown_parser import is_markdown_file
+
 
 # Mapping of file extensions to diagram types
 EXTENSION_TO_TYPE = {
@@ -27,7 +29,7 @@ def get_diagram_type(file_path: Path) -> Optional[str]:
 
 def is_supported_file(file_path: Path) -> bool:
     """
-    Check if a file is a supported diagram file.
+    Check if a file is a supported diagram or markdown file.
 
     Args:
         file_path: Path to the file
@@ -35,4 +37,4 @@ def is_supported_file(file_path: Path) -> bool:
     Returns:
         True if the file is supported, False otherwise
     """
-    return get_diagram_type(file_path) is not None
+    return get_diagram_type(file_path) is not None or is_markdown_file(file_path)

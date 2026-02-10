@@ -40,7 +40,7 @@ class TestWindowManager:
         assert result == mock_window
         assert manager.windows["/path/to/test/file.dot"] == mock_window
         assert manager.window_count == 1
-        manager._create_window.assert_called_once_with("/path/to/test/file.dot")
+        manager._create_window.assert_called_once_with("/path/to/test/file.dot", actual_file_path=None, window_title=None)
 
     def test_get_window_for_file_existing(self):
         """Test getting window for existing file."""
@@ -98,7 +98,7 @@ class TestWindowManager:
 
         assert result == mock_window
         assert manager.windows["/path/to/test/file.dot"] == mock_window
-        manager._create_window.assert_called_once_with("/path/to/test/file.dot")
+        manager._create_window.assert_called_once_with("/path/to/test/file.dot", actual_file_path=None, window_title=None)
 
     def test_get_or_create_window_existing(self):
         """Test getting or creating a window for existing file."""
@@ -200,7 +200,7 @@ class TestWindowFactory:
             result = manager._create_window("/path/to/test/file.dot")
 
             # Verify DiagramWindow was created correctly
-            mock_diagram_window.assert_called_once_with("/path/to/test/file.dot", window_manager=manager)
+            mock_diagram_window.assert_called_once_with("/path/to/test/file.dot", window_manager=manager, actual_file_path=None)
 
             # Verify the result
             assert result == mock_window_instance
@@ -245,7 +245,7 @@ class TestWindowFactory:
 
                 result = manager._create_window(file_path)
 
-                mock_diagram_window.assert_called_with(file_path, window_manager=manager)
+                mock_diagram_window.assert_called_with(file_path, window_manager=manager, actual_file_path=None)
                 assert result.file_path == file_path
 
 
@@ -1274,7 +1274,7 @@ class TestDiagramWindowToolbar:
             mock_fit.assert_not_called()
 
     def test_copy_source_to_clipboard(self):
-        """Test copying source code to clipboard."""
+        """Test copying source code to clipboard by reading file."""
         from unittest.mock import patch, Mock
 
         with patch('PySide6.QtWidgets.QApplication') as mock_qapp, \
@@ -1290,6 +1290,8 @@ class TestDiagramWindowToolbar:
             # Create a mock window object
             mock_window = Mock()
             mock_window.file_path = "/path/to/test/file.dot"
+            mock_window.actual_file_path = "/path/to/test/file.dot"
+            mock_window.source_code = None  # No stored source, should read from file
 
             # Import and bind the method to our mock
             from dacwatch.window_manager import DiagramWindow
@@ -1298,7 +1300,7 @@ class TestDiagramWindowToolbar:
             # Call copy_source_to_clipboard
             mock_window.copy_source_to_clipboard()
 
-            # Verify file was opened and read
+            # Verify file was opened and read using actual_file_path
             mock_open.assert_called_once_with("/path/to/test/file.dot", 'r')
             mock_file.read.assert_called_once()
             # Verify clipboard was set with source content
@@ -1313,6 +1315,7 @@ class TestDiagramWindowToolbar:
             # Create a mock window object
             mock_window = Mock()
             mock_window.file_path = "/path/to/test/file.dot"
+            mock_window.actual_file_path = "/path/to/test/file.dot"
 
             # Import and bind the method to our mock
             from dacwatch.window_manager import DiagramWindow
@@ -1321,7 +1324,7 @@ class TestDiagramWindowToolbar:
             # Call reveal_in_finder
             mock_window.reveal_in_finder()
 
-            # Verify subprocess.run was called with correct arguments
+            # Verify subprocess.run was called with correct arguments (uses actual_file_path)
             mock_subprocess.assert_called_once_with(['open', '-R', "/path/to/test/file.dot"])
 
 
@@ -1810,3 +1813,180 @@ class TestZoomableGraphicsViewDoubleClick:
         # This should not raise an exception even though there's no parent window
         graphics_view.mouseDoubleClickEvent(double_click_event)
         # Test passes if no exception is raised
+
+
+class TestMarkdownWindows:
+    """Test suite for markdown window management."""
+
+    def test_cleanup_markdown_windows(self):
+        """Test closing all windows for a markdown file."""
+        manager = WindowManager()
+
+        mock_w0 = Mock()
+        mock_w0.close = Mock()
+        mock_w1 = Mock()
+        mock_w1.close = Mock()
+        mock_other = Mock()
+        mock_other.close = Mock()
+
+        manager.windows = {
+            "/path/to/doc.md:0": mock_w0,
+            "/path/to/doc.md:1": mock_w1,
+            "/path/to/other.dot": mock_other,
+        }
+
+        manager.cleanup_markdown_windows("/path/to/doc.md")
+
+        mock_w0.close.assert_called_once()
+        mock_w1.close.assert_called_once()
+        mock_other.close.assert_not_called()
+        assert "/path/to/doc.md:0" not in manager.windows
+        assert "/path/to/doc.md:1" not in manager.windows
+        assert "/path/to/other.dot" in manager.windows
+
+    def test_cleanup_stale_markdown_windows(self):
+        """Test closing windows for blocks that no longer exist."""
+        manager = WindowManager()
+
+        mock_w0 = Mock()
+        mock_w0.close = Mock()
+        mock_w1 = Mock()
+        mock_w1.close = Mock()
+        mock_w2 = Mock()
+        mock_w2.close = Mock()
+
+        manager.windows = {
+            "/path/to/doc.md:0": mock_w0,
+            "/path/to/doc.md:1": mock_w1,
+            "/path/to/doc.md:2": mock_w2,
+        }
+
+        # Only 1 block remains
+        manager.cleanup_stale_markdown_windows("/path/to/doc.md", 1)
+
+        mock_w0.close.assert_not_called()
+        mock_w1.close.assert_called_once()
+        mock_w2.close.assert_called_once()
+        assert "/path/to/doc.md:0" in manager.windows
+        assert "/path/to/doc.md:1" not in manager.windows
+        assert "/path/to/doc.md:2" not in manager.windows
+
+    def test_cleanup_stale_no_stale(self):
+        """Test cleanup when no windows are stale."""
+        manager = WindowManager()
+
+        mock_w0 = Mock()
+        mock_w0.close = Mock()
+        mock_w1 = Mock()
+        mock_w1.close = Mock()
+
+        manager.windows = {
+            "/path/to/doc.md:0": mock_w0,
+            "/path/to/doc.md:1": mock_w1,
+        }
+
+        manager.cleanup_stale_markdown_windows("/path/to/doc.md", 2)
+
+        mock_w0.close.assert_not_called()
+        mock_w1.close.assert_not_called()
+        assert manager.window_count == 2
+
+    def test_cleanup_markdown_windows_no_match(self):
+        """Test cleanup when no matching markdown windows exist."""
+        manager = WindowManager()
+        mock_window = Mock()
+        mock_window.close = Mock()
+        manager.windows = {"/path/to/other.dot": mock_window}
+
+        manager.cleanup_markdown_windows("/path/to/doc.md")
+
+        mock_window.close.assert_not_called()
+        assert manager.window_count == 1
+
+    def test_actual_file_path_default(self, qtbot):
+        """Test that actual_file_path defaults to file_path."""
+        from dacwatch.window_manager import DiagramWindow
+
+        window = DiagramWindow("/path/to/file.dot")
+        qtbot.addWidget(window)
+
+        assert window.file_path == "/path/to/file.dot"
+        assert window.actual_file_path == "/path/to/file.dot"
+
+    def test_actual_file_path_custom(self, qtbot):
+        """Test that actual_file_path can be set separately."""
+        from dacwatch.window_manager import DiagramWindow
+
+        window = DiagramWindow("/path/to/doc.md:0", actual_file_path="/path/to/doc.md")
+        qtbot.addWidget(window)
+
+        assert window.file_path == "/path/to/doc.md:0"
+        assert window.actual_file_path == "/path/to/doc.md"
+
+    def test_window_title_uses_actual_file_path(self, qtbot):
+        """Test window title uses actual_file_path for display."""
+        from dacwatch.window_manager import DiagramWindow
+
+        window = DiagramWindow("/path/to/doc.md:0", actual_file_path="/path/to/doc.md")
+        qtbot.addWidget(window)
+
+        assert "doc.md" in window.windowTitle()
+
+    def test_create_window_with_actual_file_path(self):
+        """Test creating a window with actual_file_path through WindowManager."""
+        manager = WindowManager()
+
+        mock_window = Mock()
+        mock_window.file_path = "/path/to/doc.md:0"
+
+        with patch('dacwatch.window_manager.DiagramWindow') as mock_dw:
+            mock_dw.return_value = mock_window
+
+            result = manager.create_window(
+                "/path/to/doc.md:0",
+                actual_file_path="/path/to/doc.md",
+                window_title="DaCWatch - doc.md:0 (plantuml)"
+            )
+
+            mock_dw.assert_called_once_with(
+                "/path/to/doc.md:0",
+                window_manager=manager,
+                actual_file_path="/path/to/doc.md"
+            )
+            mock_window.setWindowTitle.assert_called_once_with("DaCWatch - doc.md:0 (plantuml)")
+
+    def test_get_or_create_window_with_actual_file_path(self):
+        """Test get_or_create_window passes actual_file_path for new windows."""
+        manager = WindowManager()
+
+        mock_window = Mock()
+        mock_window.file_path = "/path/to/doc.md:0"
+
+        with patch('dacwatch.window_manager.DiagramWindow') as mock_dw:
+            mock_dw.return_value = mock_window
+
+            result = manager.get_or_create_window(
+                "/path/to/doc.md:0",
+                actual_file_path="/path/to/doc.md",
+                window_title="DaCWatch - doc.md:0 (mermaid)"
+            )
+
+            assert result == mock_window
+            mock_dw.assert_called_once_with(
+                "/path/to/doc.md:0",
+                window_manager=manager,
+                actual_file_path="/path/to/doc.md"
+            )
+
+    def test_reveal_uses_actual_file_path(self):
+        """Test that reveal_in_finder uses actual_file_path."""
+        from dacwatch.window_manager import DiagramWindow
+
+        with patch('subprocess.run') as mock_subprocess:
+            mock_window = Mock()
+            mock_window.actual_file_path = "/path/to/doc.md"
+            mock_window.reveal_in_finder = DiagramWindow.reveal_in_finder.__get__(mock_window, DiagramWindow)
+
+            mock_window.reveal_in_finder()
+
+            mock_subprocess.assert_called_once_with(['open', '-R', "/path/to/doc.md"])

@@ -227,9 +227,10 @@ class ZoomableGraphicsView(QGraphicsView):
 class DiagramWindow(QMainWindow):
     """A window for displaying diagram files."""
 
-    def __init__(self, file_path: str, window_manager: Optional['WindowManager'] = None):
+    def __init__(self, file_path: str, window_manager: Optional['WindowManager'] = None, actual_file_path: Optional[str] = None):
         super().__init__()
         self.file_path = file_path
+        self.actual_file_path = actual_file_path or file_path
         self.window_manager = window_manager
         self.loading_label: Optional[QLabel] = None
         self.format_label: Optional[QLabel] = None
@@ -241,8 +242,8 @@ class DiagramWindow(QMainWindow):
 
     def _setup_ui(self):
         """Setup the user interface."""
-        # Set window title
-        file_name = Path(self.file_path).name
+        # Set window title using actual_file_path (the real file on disk)
+        file_name = Path(self.actual_file_path).name
         self.setWindowTitle(f"DaCWatch - {file_name}")
 
         # Window stays on top controlled by action (macOS only - Linux has window visibility issues)
@@ -874,13 +875,18 @@ class DiagramWindow(QMainWindow):
     def copy_source_to_clipboard(self):
         """Copy the source code to clipboard."""
         try:
-            with open(self.file_path, 'r') as f:
-                source_code = f.read()
+            # Use stored source_code if available (e.g. for markdown diagram blocks),
+            # otherwise read from the actual file on disk
+            if hasattr(self, 'source_code') and self.source_code:
+                source_code = self.source_code
+            else:
+                with open(self.actual_file_path, 'r') as f:
+                    source_code = f.read()
 
             from PySide6.QtWidgets import QApplication
             clipboard = QApplication.clipboard()
             clipboard.setText(source_code)
-            
+
             # Show toast notification
             self.toast.show_toast("Copied source")
         except Exception:
@@ -900,16 +906,17 @@ class DiagramWindow(QMainWindow):
         import sys
         import os
         try:
+            reveal_path = self.actual_file_path
             if sys.platform == 'darwin':
                 # macOS: open -R reveals in Finder
-                subprocess.run(['open', '-R', self.file_path])
+                subprocess.run(['open', '-R', reveal_path])
             elif sys.platform.startswith('linux'):
                 # Linux: xdg-open the parent directory
-                parent_dir = os.path.dirname(os.path.abspath(self.file_path))
+                parent_dir = os.path.dirname(os.path.abspath(reveal_path))
                 subprocess.run(['xdg-open', parent_dir])
             elif sys.platform == 'win32':
                 # Windows: explorer /select reveals in Explorer
-                subprocess.run(['explorer', '/select,', self.file_path])
+                subprocess.run(['explorer', '/select,', reveal_path])
         except (subprocess.SubprocessError, OSError):
             # If subprocess fails, just continue
             pass
@@ -1074,17 +1081,19 @@ class WindowManager:
         """
         return self.windows.get(file_path)
 
-    def create_window(self, file_path: str) -> Any:
+    def create_window(self, file_path: str, actual_file_path: Optional[str] = None, window_title: Optional[str] = None) -> Any:
         """
         Create a new window for a file.
 
         Args:
-            file_path: Path to the file
+            file_path: Key for the window (may be 'path:N' for markdown)
+            actual_file_path: Real file path on disk (defaults to file_path)
+            window_title: Custom window title (optional)
 
         Returns:
             The created window object
         """
-        window = self._create_window(file_path)
+        window = self._create_window(file_path, actual_file_path=actual_file_path, window_title=window_title)
         self.windows[file_path] = window
 
         # Restore previous state if available
@@ -1124,19 +1133,21 @@ class WindowManager:
             # Persist state to disk
             self.persist_state()
 
-    def get_or_create_window(self, file_path: str) -> Any:
+    def get_or_create_window(self, file_path: str, actual_file_path: Optional[str] = None, window_title: Optional[str] = None) -> Any:
         """
         Get existing window for file, or create a new one if it doesn't exist.
 
         Args:
-            file_path: Path to the file
+            file_path: Key for the window (may be 'path:N' for markdown)
+            actual_file_path: Real file path on disk (defaults to file_path)
+            window_title: Custom window title (optional)
 
         Returns:
             The window object
         """
         window = self.get_window_for_file(file_path)
         if window is None:
-            window = self.create_window(file_path)
+            window = self.create_window(file_path, actual_file_path=actual_file_path, window_title=window_title)
         # Window will automatically stay on top due to WindowStaysOnTopHint
         return window
 
@@ -1284,14 +1295,52 @@ class WindowManager:
             # If we can't load state, start with empty state
             self.window_states = {}
 
-    def _create_window(self, file_path: str) -> DiagramWindow:
+    def cleanup_markdown_windows(self, markdown_file_path: str):
+        """
+        Close all windows derived from a markdown file.
+
+        Args:
+            markdown_file_path: Path to the markdown file
+        """
+        prefix = f"{markdown_file_path}:"
+        keys_to_close = [k for k in self.windows if k.startswith(prefix)]
+        for key in keys_to_close:
+            self.close_window(key)
+
+    def cleanup_stale_markdown_windows(self, markdown_file_path: str, current_block_count: int):
+        """
+        Close windows for diagram blocks that no longer exist.
+
+        Args:
+            markdown_file_path: Path to the markdown file
+            current_block_count: Current number of diagram blocks in the file
+        """
+        prefix = f"{markdown_file_path}:"
+        keys_to_close = []
+        for key in self.windows:
+            if key.startswith(prefix):
+                try:
+                    index = int(key[len(prefix):])
+                    if index >= current_block_count:
+                        keys_to_close.append(key)
+                except ValueError:
+                    pass
+        for key in keys_to_close:
+            self.close_window(key)
+
+    def _create_window(self, file_path: str, actual_file_path: Optional[str] = None, window_title: Optional[str] = None) -> DiagramWindow:
         """
         Create a DiagramWindow for a diagram file.
 
         Args:
-            file_path: Path to the diagram file
+            file_path: Key for the window (may be 'path:N' for markdown)
+            actual_file_path: Real file path on disk (defaults to file_path)
+            window_title: Custom window title (optional)
 
         Returns:
             A DiagramWindow instance for the diagram
         """
-        return DiagramWindow(file_path, window_manager=self)
+        window = DiagramWindow(file_path, window_manager=self, actual_file_path=actual_file_path)
+        if window_title:
+            window.setWindowTitle(window_title)
+        return window

@@ -59,9 +59,22 @@ def test_is_supported_file():
     assert is_supported_file(Path("diagram.puml")) is True
     assert is_supported_file(Path("diagram.plantuml")) is True
     assert is_supported_file(Path("diagram.mermaid")) is True
+    assert is_supported_file(Path("docs.md")) is True
 
     assert is_supported_file(Path("diagram.txt")) is False
     assert is_supported_file(Path("diagram.py")) is False
+
+
+def test_is_supported_file_markdown():
+    """Test that markdown files are supported."""
+    assert is_supported_file(Path("README.md")) is True
+    assert is_supported_file(Path("notes.MD")) is True
+    assert is_supported_file(Path("/path/to/docs.md")) is True
+
+
+def test_markdown_not_a_diagram_type():
+    """Test that .md files don't have a diagram type (they're parsed differently)."""
+    assert get_diagram_type(Path("docs.md")) is None
 
 
 def test_get_diagram_type_no_extension():
