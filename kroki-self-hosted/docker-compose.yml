@@ -1,6 +1,6 @@
 services:
   kroki:
-    image: yuzutech/kroki:0.28.0
+    image: yuzutech/kroki:0.29.1
     ports:
       - "48000:8000"
     depends_on:
@@ -14,17 +14,17 @@ services:
       - KROKI_EXCALIDRAW_HOST=excalidraw
   mermaid:
     restart: unless-stopped
-    image: yuzutech/kroki-mermaid:0.28.0
+    image: yuzutech/kroki-mermaid:0.29.1
     expose:
       - "8002"
   bpmn:
     restart: unless-stopped
-    image: yuzutech/kroki-bpmn:0.28.0
+    image: yuzutech/kroki-bpmn:0.29.1
     expose:
       - "8003"
   excalidraw:
     restart: unless-stopped
-    image: yuzutech/kroki-excalidraw:0.28.0
+    image: yuzutech/kroki-excalidraw:0.29.1
     expose:
       - "8004"
   niolesk:
@@ -36,4 +36,4 @@ services:
     hostname: niolesk
     restart: unless-stopped
     environment:
-      - NIOLESK_KROKI_ENGINE=${NIOLESK_KROKI_ENGINE:-http://localhost:48000/}
+      - NIOLESK_KROKI_ENGINE=${NIOLESK_KROKI_ENGINE:-https://kroki.kroki-self-hosted.orb.local/}
