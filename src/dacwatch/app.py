@@ -11,6 +11,9 @@ from .window_manager import WindowManager
 from .kroki_client import KrokiClient
 from .markdown_parser import is_markdown_file, extract_diagram_blocks
 
+# Diagram types whose SVG uses <foreignObject> (unsupported by Qt's QSvgRenderer)
+_PNG_DEFAULT_TYPES = frozenset({"mermaid"})
+
 
 class DaCWatchApp:
     """Main application class for DaCWatch."""
@@ -96,6 +99,11 @@ class DaCWatchApp:
         else:
             await self._handle_diagram_event(event_type, file_path)
 
+    @staticmethod
+    def _default_format(diagram_type: str) -> str:
+        """Return the default render format for a diagram type."""
+        return "png" if diagram_type in _PNG_DEFAULT_TYPES else "svg"
+
     async def _handle_diagram_event(self, event_type: str, file_path: str):
         """Handle events for regular diagram files (.dot, .puml, .mermaid)."""
         if event_type in ['created', 'modified']:
@@ -172,7 +180,8 @@ class DaCWatchApp:
                 window.format_toggle_callback = create_md_format_callback(file_path, block.index, self.window_manager)
 
                 try:
-                    await self._render_and_display(block.source, block.diagram_type, window)
+                    fmt = self._default_format(block.diagram_type)
+                    await self._render_and_display(block.source, block.diagram_type, window, fmt)
                 except Exception as e:
                     print(f"Error rendering markdown block {block.index} from {file_path}: {e}")
 
@@ -193,7 +202,7 @@ class DaCWatchApp:
         block = blocks[block_index]
         await self._render_and_display(block.source, block.diagram_type, window, format)
 
-    async def _render_and_display_diagram(self, file_path: str, window, format: str = "svg"):
+    async def _render_and_display_diagram(self, file_path: str, window, format: str | None = None):
         """Read a diagram file and render it in the window."""
         if not self.kroki_client:
             print(f"Kroki client not available")
@@ -209,6 +218,9 @@ class DaCWatchApp:
             if not diagram_type:
                 print(f"Unsupported file type for {file_path}")
                 return
+
+            if format is None:
+                format = self._default_format(diagram_type)
 
             await self._render_and_display(source_code, diagram_type, window, format)
 
