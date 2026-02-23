@@ -589,10 +589,15 @@ class DiagramWindow(QMainWindow):
         toolbar = QToolBar("Diagram Actions")
         self.addToolBar(Qt.ToolBarArea.TopToolBarArea, toolbar)
 
-        # Copy image button
+        # Copy image button (white background)
         self.copy_image_button = QPushButton("📋 Image")
-        self.copy_image_button.clicked.connect(self.copy_image_to_clipboard)
+        self.copy_image_button.clicked.connect(self.copy_image_with_white_background)
         toolbar.addWidget(self.copy_image_button)
+
+        # Copy transparent image button
+        self.copy_transparent_button = QPushButton("📋 Transparent")
+        self.copy_transparent_button.clicked.connect(self.copy_image_to_clipboard)
+        toolbar.addWidget(self.copy_transparent_button)
 
         # Copy source button
         self.copy_source_button = QPushButton("📋 Source")
@@ -755,13 +760,13 @@ class DiagramWindow(QMainWindow):
         reset_zoom_shortcut = QShortcut(QKeySequence("Ctrl+0"), self)
         reset_zoom_shortcut.activated.connect(self.reset_zoom)
         
-        # Copy image (Cmd+C)
+        # Copy image with white background (Cmd+C)
         copy_image_shortcut = QShortcut(QKeySequence.StandardKey.Copy, self)
-        copy_image_shortcut.activated.connect(self.copy_image_to_clipboard)
+        copy_image_shortcut.activated.connect(self.copy_image_with_white_background)
 
-        # Copy image with white background (Cmd+Option+C)
+        # Copy image with transparency (Cmd+Option+C)
         copy_white_bg_shortcut = QShortcut(QKeySequence("Ctrl+Alt+C"), self)
-        copy_white_bg_shortcut.activated.connect(self.copy_image_with_white_background)
+        copy_white_bg_shortcut.activated.connect(self.copy_image_to_clipboard)
 
         # Copy source (Cmd+Shift+C)
         copy_source_shortcut = QShortcut(QKeySequence("Ctrl+Shift+C"), self)
@@ -826,7 +831,7 @@ class DiagramWindow(QMainWindow):
 
             # Show toast notification
             if hasattr(self, 'toast') and self.toast:
-                self.toast.show_toast("Copied image")
+                self.toast.show_toast("Copied transparent image")
         except (RuntimeError, AttributeError):
             # Pixmap item or toast might have been deleted
             pass

@@ -770,20 +770,20 @@ class TestDiagramWindowToolbar:
         qtbot.addWidget(window)
         
         # Mock the methods to verify they're called
-        with patch.object(window, 'copy_image_to_clipboard') as mock_copy_image, \
+        with patch.object(window, 'copy_image_with_white_background') as mock_copy_white_bg, \
              patch.object(window, 'copy_source_to_clipboard') as mock_copy_source, \
              patch.object(window, 'toggle_format') as mock_toggle_format, \
              patch.object(window.always_on_top_action, 'trigger') as mock_toggle_always_on_top, \
              patch.object(window, 'reveal_in_finder') as mock_reveal_finder:
-            
+
             # Give focus to the window
             window.show()
             qtbot.waitForWindowShown(window)
-            
-            # Test Cmd+C (copy image) - on macOS this uses ControlModifier in Qt
+
+            # Test Cmd+C (copy image with white background) - on macOS this uses ControlModifier in Qt
             QTest.keyClick(window, Qt.Key.Key_C, Qt.KeyboardModifier.ControlModifier)
             qtbot.wait(10)  # Small wait for signal processing
-            mock_copy_image.assert_called_once()
+            mock_copy_white_bg.assert_called_once()
             
             # Test Cmd+Shift+C (copy source)  
             QTest.keyClick(window, Qt.Key.Key_C, Qt.KeyboardModifier.ControlModifier | Qt.KeyboardModifier.ShiftModifier)
@@ -838,11 +838,11 @@ class TestDiagramWindowToolbar:
             # Initially toast should be hidden
             assert not window.toast.isVisible()
             
-            # Test image copy toast
-            window.copy_image_to_clipboard()
+            # Test image copy toast (white background is the default)
+            window.copy_image_with_white_background()
             qtbot.wait(10)  # Small wait for UI update
             assert window.toast.isVisible()
-            assert window.toast.text() == "Copied image"
+            assert window.toast.text() == "Copied with white background"
             
             # Wait for toast to disappear
             qtbot.wait(600)  # Toast duration is 500ms plus buffer
