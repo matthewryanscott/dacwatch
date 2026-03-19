@@ -343,6 +343,7 @@ class DiagramWindow(QMainWindow):
         
         # Create pixmap item and add to scene
         pixmap_item = QGraphicsPixmapItem(pixmap)
+        pixmap_item.setTransformationMode(Qt.TransformationMode.SmoothTransformation)
         graphics_scene.addItem(pixmap_item)
         
         # Set scene on view
