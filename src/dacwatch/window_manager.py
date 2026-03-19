@@ -9,6 +9,7 @@ from PySide6.QtCore import Qt, QEvent, QTimer, QPropertyAnimation, QEasingCurve
 from PySide6.QtGui import QPainter, QAction
 
 from .clipboard import copy_pixmap_to_clipboard, copy_text_to_clipboard
+from .diagram_renderer import DiagramRenderer
 
 
 class ToastWidget(QLabel):
@@ -297,49 +298,12 @@ class DiagramWindow(QMainWindow):
         if format not in ["svg", "png"]:
             raise ValueError("Format must be 'svg' or 'png'")
 
-        from PySide6.QtGui import QPixmap, QPainter
-        from PySide6.QtCore import QByteArray, QSize
-        from PySide6.QtSvg import QSvgRenderer
-
         # Window will automatically stay on top due to WindowStaysOnTopHint
 
-        # Get device pixel ratio for high-DPI displays
+        # Render image data to pixmap using DiagramRenderer
         device_pixel_ratio = self.devicePixelRatio()
+        pixmap = DiagramRenderer.render_to_pixmap(image_data, format, device_pixel_ratio)
 
-        # Create pixmap from image data with high-DPI support
-        if format == "svg":
-            # For SVG, use QSvgRenderer for high-quality rendering
-            byte_array = QByteArray(image_data)
-            svg_renderer = QSvgRenderer(byte_array)
-            
-            if svg_renderer.isValid():
-                # Get default size or use fallback
-                default_size = svg_renderer.defaultSize()
-                if default_size.isEmpty() or default_size.width() <= 0 or default_size.height() <= 0:
-                    default_size = QSize(800, 600)
-                
-                # Render at high resolution for crisp display on high-DPI screens
-                display_width = int(default_size.width() * device_pixel_ratio)
-                display_height = int(default_size.height() * device_pixel_ratio)
-                
-                pixmap = QPixmap(display_width, display_height)
-                pixmap.fill(Qt.GlobalColor.transparent)
-                
-                painter = QPainter(pixmap)
-                painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-                painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
-                svg_renderer.render(painter)
-                painter.end()
-                
-                # CRITICAL: Set device pixel ratio so Qt knows this is a high-DPI pixmap
-                pixmap.setDevicePixelRatio(device_pixel_ratio)
-            else:
-                pixmap = QPixmap()
-        else:  # PNG
-            pixmap = QPixmap()
-            pixmap.loadFromData(image_data)
-            pixmap.setDevicePixelRatio(device_pixel_ratio)
-        
         # Create graphics view and scene for zoomable display
         graphics_view = ZoomableGraphicsView(parent_window=self)
         graphics_scene = QGraphicsScene()
@@ -802,44 +766,13 @@ class DiagramWindow(QMainWindow):
 
     def _render_svg_to_viewport(self):
         """Re-render SVG at the exact viewport size for pixel-perfect auto-scale."""
-        from PySide6.QtGui import QPixmap, QPainter
-        from PySide6.QtCore import QByteArray, QSizeF
-        from PySide6.QtSvg import QSvgRenderer
-
-        byte_array = QByteArray(self.image_data)
-        svg_renderer = QSvgRenderer(byte_array)
-        if not svg_renderer.isValid():
-            return
-
-        device_pixel_ratio = self.devicePixelRatio()
         viewport_size = self.graphics_view.viewport().size()
-
-        # Calculate target size maintaining SVG aspect ratio
-        svg_size = QSizeF(svg_renderer.defaultSize())
-        if svg_size.isEmpty():
-            return
-        svg_size.scale(
-            float(viewport_size.width()),
-            float(viewport_size.height()),
-            Qt.AspectRatioMode.KeepAspectRatio,
+        device_pixel_ratio = self.devicePixelRatio()
+        pixmap = DiagramRenderer.render_svg_to_size(
+            self.image_data, viewport_size.width(), viewport_size.height(), device_pixel_ratio
         )
-
-        # Render at physical pixel resolution for high-DPI
-        render_width = int(svg_size.width() * device_pixel_ratio)
-        render_height = int(svg_size.height() * device_pixel_ratio)
-
-        pixmap = QPixmap(render_width, render_height)
-        pixmap.fill(Qt.GlobalColor.transparent)
-
-        painter = QPainter(pixmap)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
-        svg_renderer.render(painter)
-        painter.end()
-
-        pixmap.setDevicePixelRatio(device_pixel_ratio)
-
-        # Replace pixmap in existing item and reset the view to 1:1
+        if pixmap.isNull():
+            return
         self.pixmap_item.setPixmap(pixmap)
         self.graphics_view.resetTransform()
         self.graphics_view.setSceneRect(self.graphics_view.scene().itemsBoundingRect())
