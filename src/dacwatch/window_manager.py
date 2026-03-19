@@ -11,6 +11,7 @@ from PySide6.QtGui import QAction
 from .clipboard import copy_pixmap_to_clipboard, copy_text_to_clipboard
 from .diagram_renderer import DiagramRenderer
 from .graphics_view import ZoomableGraphicsView, ToastWidget
+from .zoom_controller import ZoomController
 
 
 class DiagramWindow(QMainWindow):
@@ -24,11 +25,9 @@ class DiagramWindow(QMainWindow):
         self.loading_label: Optional[QLabel] = None
         self.format_label: Optional[QLabel] = None
         self.format_toggle_callback: Optional[Callable[[str], None]] = None
-        self.current_zoom_scale: float = 1.0  # Store current zoom level
+        self.zoom = ZoomController()
         self.is_first_display: bool = True  # Track if this is the first image display
         self.should_auto_fit: bool = True  # Track if window should auto-fit on next image display
-        self.auto_scale_enabled: bool = False  # Track auto-scale mode
-        self._resize_timer = None  # Debounce timer for auto-scale re-render
         self._setup_ui()
 
     def _setup_ui(self):
@@ -102,23 +101,14 @@ class DiagramWindow(QMainWindow):
         # Set white background for the graphics view
         graphics_view.setStyleSheet("QGraphicsView { background-color: white; }")
         
-        # Save current zoom before replacing view (only if not first display)
+        # Preserve zoom from outgoing view (only if not first display)
         if not self.is_first_display and hasattr(self, 'graphics_view') and self.graphics_view:
-            try:
-                self.current_zoom_scale = self.graphics_view.get_current_scale()
-            except (RuntimeError, AttributeError):
-                # Graphics view might have been deleted, use current stored value
-                pass
-        
+            self.zoom.preserve_zoom(self.graphics_view)
+
+        # Restore zoom to new view (resets to 1:1 on first display)
+        self.zoom.restore_zoom(graphics_view, is_first=self.is_first_display)
         if self.is_first_display:
-            # First time - reset transform for true 1:1 display (no scaling)
-            graphics_view.resetTransform()
-            self.current_zoom_scale = 1.0
             self.is_first_display = False
-        else:
-            # Subsequent updates - reset transform first, then apply saved scale
-            graphics_view.resetTransform()
-            graphics_view.set_scale(self.current_zoom_scale)
         
         # Auto-fit window to diagram if this is the first display or after reappearing
         if self.should_auto_fit and self.isVisible():
@@ -133,7 +123,7 @@ class DiagramWindow(QMainWindow):
             QTimer.singleShot(50, auto_fit_after_display)
         
         # Update zoom label
-        self._update_zoom_label()
+        self.zoom.update_label(self.zoom_label)
 
         # Update format radio buttons
         if hasattr(self, 'svg_radio') and hasattr(self, 'png_radio'):
@@ -183,11 +173,10 @@ class DiagramWindow(QMainWindow):
         self.pixmap_item = pixmap_item
 
         # Apply auto scale mode if enabled
-        if self.auto_scale_enabled:
+        if self.zoom.auto_scale_enabled:
             graphics_view.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
             graphics_view.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-            from PySide6.QtCore import QTimer
-            QTimer.singleShot(50, self._apply_auto_scale)
+            QTimer.singleShot(50, self._do_apply_auto_scale)
 
         # Set focus to the graphics view for keyboard navigation
         # Use a small delay to ensure focus is set after all other UI updates complete
@@ -442,21 +431,12 @@ class DiagramWindow(QMainWindow):
         self.image_data = None
         
         # Update initial zoom label
-        self._update_zoom_label()
-        
-        # Update initial zoom label
-        self._update_zoom_label()
+        self.zoom.update_label(self.zoom_label)
 
     def _update_zoom_label(self):
         """Update the zoom label with current zoom percentage."""
         if hasattr(self, 'zoom_label') and self.zoom_label:
-            try:
-                # Convert zoom scale to percentage
-                zoom_percent = int(self.current_zoom_scale * 100)
-                self.zoom_label.setText(f"{zoom_percent}%")
-            except (RuntimeError, AttributeError):
-                # Label might have been deleted
-                pass
+            self.zoom.update_label(self.zoom_label)
 
     def _on_format_radio_toggled(self, button_id, checked):
         """Handle format radio button toggle."""
@@ -509,56 +489,22 @@ class DiagramWindow(QMainWindow):
 
     def _handle_auto_scale(self, checked: bool):
         """Handle auto scale toggle."""
-        self.auto_scale_enabled = checked
         if hasattr(self, 'graphics_view') and self.graphics_view:
+            self.zoom.set_auto_scale(checked, self.graphics_view)
             if checked:
-                # Hide scrollbars and fit diagram to viewport
-                self.graphics_view.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-                self.graphics_view.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-                self._apply_auto_scale()
-            else:
-                # Restore scrollbars and zoom level
-                self.graphics_view.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-                self.graphics_view.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-                self._update_zoom_label()
+                self._do_apply_auto_scale()
+            self.zoom.update_label(self.zoom_label)
 
-    def _apply_auto_scale(self):
-        """Fit the diagram to the current viewport, maintaining aspect ratio.
-
-        For SVGs, re-renders at the exact viewport resolution for pixel-perfect quality.
-        For PNGs, scales the rasterized pixmap with smooth transformation.
-        """
-        if not self.auto_scale_enabled:
-            return
-        if not hasattr(self, 'graphics_view') or not self.graphics_view:
-            return
-        if not hasattr(self, 'pixmap_item') or not self.pixmap_item:
-            return
-        try:
-            if getattr(self, 'current_format', None) == 'svg' and getattr(self, 'image_data', None):
-                self._render_svg_to_viewport()
-            else:
-                scene_rect = self.graphics_view.scene().itemsBoundingRect()
-                if not scene_rect.isNull():
-                    self.graphics_view.resetTransform()
-                    self.graphics_view.fitInView(scene_rect, Qt.AspectRatioMode.KeepAspectRatio)
-            self.current_zoom_scale = self.graphics_view.get_current_scale()
-            self._update_zoom_label()
-        except (RuntimeError, AttributeError):
-            pass
-
-    def _render_svg_to_viewport(self):
-        """Re-render SVG at the exact viewport size for pixel-perfect auto-scale."""
-        viewport_size = self.graphics_view.viewport().size()
-        device_pixel_ratio = self.devicePixelRatio()
-        pixmap = DiagramRenderer.render_svg_to_size(
-            self.image_data, viewport_size.width(), viewport_size.height(), device_pixel_ratio
-        )
-        if pixmap.isNull():
-            return
-        self.pixmap_item.setPixmap(pixmap)
-        self.graphics_view.resetTransform()
-        self.graphics_view.setSceneRect(self.graphics_view.scene().itemsBoundingRect())
+    def _do_apply_auto_scale(self):
+        """Delegate auto-scale to the zoom controller."""
+        if hasattr(self, 'graphics_view') and self.graphics_view and hasattr(self, 'pixmap_item') and self.pixmap_item:
+            self.zoom.apply_auto_scale(
+                self.graphics_view, self.pixmap_item,
+                getattr(self, 'image_data', None),
+                getattr(self, 'current_format', 'svg'),
+                self.devicePixelRatio(),
+            )
+            self.zoom.update_label(self.zoom_label)
 
     def _setup_shortcuts(self):
         """Setup keyboard shortcuts."""
@@ -698,42 +644,21 @@ class DiagramWindow(QMainWindow):
 
     def zoom_in(self):
         """Zoom in on the image."""
-        if self.auto_scale_enabled:
-            return
         if hasattr(self, 'graphics_view') and self.graphics_view:
-            try:
-                self.graphics_view.scale(1.25, 1.25)
-                self.current_zoom_scale = self.graphics_view.get_current_scale()
-                self._update_zoom_label()
-            except (RuntimeError, AttributeError):
-                # Graphics view might have been deleted
-                pass
+            self.zoom.zoom_in(self.graphics_view)
+            self.zoom.update_label(self.zoom_label)
 
     def zoom_out(self):
         """Zoom out on the image."""
-        if self.auto_scale_enabled:
-            return
         if hasattr(self, 'graphics_view') and self.graphics_view:
-            try:
-                self.graphics_view.scale(0.8, 0.8)
-                self.current_zoom_scale = self.graphics_view.get_current_scale()
-                self._update_zoom_label()
-            except (RuntimeError, AttributeError):
-                # Graphics view might have been deleted
-                pass
+            self.zoom.zoom_out(self.graphics_view)
+            self.zoom.update_label(self.zoom_label)
 
     def reset_zoom(self):
         """Reset zoom to 1:1 pixel ratio (no scaling)."""
-        if self.auto_scale_enabled:
-            return
         if hasattr(self, 'graphics_view') and self.graphics_view:
-            try:
-                self.graphics_view.reset_zoom()
-                self.current_zoom_scale = 1.0  # Reset to 1:1 pixel ratio
-                self._update_zoom_label()
-            except (RuntimeError, AttributeError):
-                # Graphics view might have been deleted
-                pass
+            self.zoom.reset(self.graphics_view)
+            self.zoom.update_label(self.zoom_label)
 
     def fit_to_diagram(self):
         """Resize the window to fit the diagram exactly with no scrollbars."""
@@ -792,15 +717,13 @@ class DiagramWindow(QMainWindow):
     def resizeEvent(self, event):
         """Handle window resize to re-apply auto scale (debounced for SVG re-render)."""
         super().resizeEvent(event)
-        if self.auto_scale_enabled:
-            # Debounce: cancel previous pending re-render and schedule a new one
-            if hasattr(self, '_resize_timer') and self._resize_timer is not None:
-                self._resize_timer.stop()
-            from PySide6.QtCore import QTimer
-            self._resize_timer = QTimer()
-            self._resize_timer.setSingleShot(True)
-            self._resize_timer.timeout.connect(self._apply_auto_scale)
-            self._resize_timer.start(30)  # 30ms debounce
+        if self.zoom.auto_scale_enabled and hasattr(self, 'graphics_view') and self.graphics_view:
+            self.zoom.on_resize(
+                self.graphics_view, self.pixmap_item,
+                getattr(self, 'image_data', None),
+                getattr(self, 'current_format', 'svg'),
+                self.devicePixelRatio(),
+            )
 
     def showEvent(self, event):
         """Handle window show event to set focus to graphics view."""

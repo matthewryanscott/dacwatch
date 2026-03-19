@@ -1153,7 +1153,7 @@ class TestDiagramWindowToolbar:
         
         # Zoom in first to verify reset
         window.zoom_in()
-        initial_zoom = window.current_zoom_scale
+        initial_zoom = window.zoom.current_scale
         assert initial_zoom > 1.0, "Should be zoomed in"
         
         # Mock reset_zoom to verify it's called
