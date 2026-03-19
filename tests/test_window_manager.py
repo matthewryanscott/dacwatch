@@ -1277,7 +1277,7 @@ class TestDiagramWindowToolbar:
         """Test copying source code to clipboard by reading file."""
         from unittest.mock import patch, Mock
 
-        with patch('PySide6.QtWidgets.QApplication') as mock_qapp, \
+        with patch('dacwatch.clipboard.QApplication') as mock_qapp, \
              patch('builtins.open', create=True) as mock_open:
 
             mock_clipboard_instance = Mock()

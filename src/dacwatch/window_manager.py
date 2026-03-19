@@ -8,6 +8,8 @@ from PySide6.QtWidgets import QMainWindow, QLabel, QVBoxLayout, QWidget, QGraphi
 from PySide6.QtCore import Qt, QEvent, QTimer, QPropertyAnimation, QEasingCurve
 from PySide6.QtGui import QPainter, QAction
 
+from .clipboard import copy_pixmap_to_clipboard, copy_text_to_clipboard
+
 
 class ToastWidget(QLabel):
     """A toast notification widget that appears briefly over the main window."""
@@ -919,101 +921,41 @@ class DiagramWindow(QMainWindow):
         """Copy the current image to clipboard."""
         if not hasattr(self, 'pixmap_item') or self.pixmap_item is None:
             return
-
         try:
-            from PySide6.QtWidgets import QApplication
-            from PySide6.QtGui import QImage
-            from PySide6.QtCore import QBuffer, QIODevice
-
-            # Get pixmap from the graphics item
-            pixmap = self.pixmap_item.pixmap()
-
-            # Convert to QImage with explicit transparency support
-            image = pixmap.toImage()
-
-            # Ensure the image has an alpha channel for transparency
-            if image.format() != QImage.Format.Format_ARGB32:
-                image = image.convertToFormat(QImage.Format.Format_ARGB32)
-
-            # Copy to clipboard
-            clipboard = QApplication.clipboard()
-            clipboard.setImage(image)
-
-            # Show toast notification
+            copy_pixmap_to_clipboard(self.pixmap_item.pixmap(), white_background=False)
             if hasattr(self, 'toast') and self.toast:
                 self.toast.show_toast("Copied transparent image")
         except (RuntimeError, AttributeError):
-            # Pixmap item or toast might have been deleted
             pass
 
     def copy_image_with_white_background(self):
-        """Copy the current image to clipboard with white background instead of transparent."""
+        """Copy the current image to clipboard with white background."""
         if not hasattr(self, 'pixmap_item') or self.pixmap_item is None:
             return
-
         try:
-            from PySide6.QtWidgets import QApplication
-            from PySide6.QtGui import QImage, QPainter
-            from PySide6.QtCore import Qt
-
-            # Get pixmap from the graphics item
-            pixmap = self.pixmap_item.pixmap()
-
-            # Get device pixel ratio to handle high-DPI displays correctly
-            device_pixel_ratio = pixmap.devicePixelRatio()
-
-            # Get actual pixel dimensions (physical size)
-            width = pixmap.width()
-            height = pixmap.height()
-
-            # Create a new image with white background at the same physical size
-            image = QImage(width, height, QImage.Format.Format_ARGB32)
-            image.setDevicePixelRatio(device_pixel_ratio)
-            image.fill(Qt.GlobalColor.white)
-
-            # Draw the original pixmap on top of the white background
-            painter = QPainter(image)
-            painter.drawPixmap(0, 0, pixmap)
-            painter.end()
-
-            # Copy to clipboard
-            clipboard = QApplication.clipboard()
-            clipboard.setImage(image)
-
-            # Show toast notification
+            copy_pixmap_to_clipboard(self.pixmap_item.pixmap(), white_background=True)
             if hasattr(self, 'toast') and self.toast:
                 self.toast.show_toast("Copied with white background")
         except (RuntimeError, AttributeError):
-            # Pixmap item or toast might have been deleted
             pass
 
     def copy_source_to_clipboard(self):
         """Copy the source code to clipboard."""
         try:
-            # Use stored source_code if available (e.g. for markdown diagram blocks),
-            # otherwise read from the actual file on disk
             if hasattr(self, 'source_code') and self.source_code:
-                source_code = self.source_code
+                source = self.source_code
             else:
                 with open(self.actual_file_path, 'r') as f:
-                    source_code = f.read()
-
-            from PySide6.QtWidgets import QApplication
-            clipboard = QApplication.clipboard()
-            clipboard.setText(source_code)
-
-            # Show toast notification
+                    source = f.read()
+            copy_text_to_clipboard(source)
             self.toast.show_toast("Copied source")
         except Exception:
-            # Silently ignore file read errors
             pass
 
     def copy_error_to_clipboard(self):
         """Copy the full error response to clipboard."""
         if hasattr(self, 'full_error_text') and self.full_error_text:
-            from PySide6.QtWidgets import QApplication
-            clipboard = QApplication.clipboard()
-            clipboard.setText(self.full_error_text)
+            copy_text_to_clipboard(self.full_error_text)
 
     def reveal_in_finder(self):
         """Reveal the file in Finder (macOS) or file manager (Linux/Windows)."""
