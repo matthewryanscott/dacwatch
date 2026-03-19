@@ -242,6 +242,7 @@ class DiagramWindow(QMainWindow):
         self.is_first_display: bool = True  # Track if this is the first image display
         self.should_auto_fit: bool = True  # Track if window should auto-fit on next image display
         self.auto_scale_enabled: bool = False  # Track auto-scale mode
+        self._resize_timer = None  # Debounce timer for auto-scale re-render
         self._setup_ui()
 
     def _setup_ui(self):
@@ -773,7 +774,11 @@ class DiagramWindow(QMainWindow):
                 self._update_zoom_label()
 
     def _apply_auto_scale(self):
-        """Fit the diagram to the current viewport, maintaining aspect ratio."""
+        """Fit the diagram to the current viewport, maintaining aspect ratio.
+
+        For SVGs, re-renders at the exact viewport resolution for pixel-perfect quality.
+        For PNGs, scales the rasterized pixmap with smooth transformation.
+        """
         if not self.auto_scale_enabled:
             return
         if not hasattr(self, 'graphics_view') or not self.graphics_view:
@@ -781,14 +786,61 @@ class DiagramWindow(QMainWindow):
         if not hasattr(self, 'pixmap_item') or not self.pixmap_item:
             return
         try:
-            scene_rect = self.graphics_view.scene().itemsBoundingRect()
-            if not scene_rect.isNull():
-                self.graphics_view.resetTransform()
-                self.graphics_view.fitInView(scene_rect, Qt.AspectRatioMode.KeepAspectRatio)
-                self.current_zoom_scale = self.graphics_view.get_current_scale()
-                self._update_zoom_label()
+            if getattr(self, 'current_format', None) == 'svg' and getattr(self, 'image_data', None):
+                self._render_svg_to_viewport()
+            else:
+                scene_rect = self.graphics_view.scene().itemsBoundingRect()
+                if not scene_rect.isNull():
+                    self.graphics_view.resetTransform()
+                    self.graphics_view.fitInView(scene_rect, Qt.AspectRatioMode.KeepAspectRatio)
+            self.current_zoom_scale = self.graphics_view.get_current_scale()
+            self._update_zoom_label()
         except (RuntimeError, AttributeError):
             pass
+
+    def _render_svg_to_viewport(self):
+        """Re-render SVG at the exact viewport size for pixel-perfect auto-scale."""
+        from PySide6.QtGui import QPixmap, QPainter
+        from PySide6.QtCore import QByteArray, QSizeF
+        from PySide6.QtSvg import QSvgRenderer
+
+        byte_array = QByteArray(self.image_data)
+        svg_renderer = QSvgRenderer(byte_array)
+        if not svg_renderer.isValid():
+            return
+
+        device_pixel_ratio = self.devicePixelRatio()
+        viewport_size = self.graphics_view.viewport().size()
+
+        # Calculate target size maintaining SVG aspect ratio
+        svg_size = QSizeF(svg_renderer.defaultSize())
+        if svg_size.isEmpty():
+            return
+        svg_size.scale(
+            float(viewport_size.width()),
+            float(viewport_size.height()),
+            Qt.AspectRatioMode.KeepAspectRatio,
+        )
+
+        # Render at physical pixel resolution for high-DPI
+        render_width = int(svg_size.width() * device_pixel_ratio)
+        render_height = int(svg_size.height() * device_pixel_ratio)
+
+        pixmap = QPixmap(render_width, render_height)
+        pixmap.fill(Qt.GlobalColor.transparent)
+
+        painter = QPainter(pixmap)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+        painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+        svg_renderer.render(painter)
+        painter.end()
+
+        pixmap.setDevicePixelRatio(device_pixel_ratio)
+
+        # Replace pixmap in existing item and reset the view to 1:1
+        self.pixmap_item.setPixmap(pixmap)
+        self.graphics_view.resetTransform()
+        self.graphics_view.setSceneRect(self.graphics_view.scene().itemsBoundingRect())
 
     def _setup_shortcuts(self):
         """Setup keyboard shortcuts."""
@@ -1080,10 +1132,17 @@ class DiagramWindow(QMainWindow):
             pass
 
     def resizeEvent(self, event):
-        """Handle window resize to re-apply auto scale."""
+        """Handle window resize to re-apply auto scale (debounced for SVG re-render)."""
         super().resizeEvent(event)
         if self.auto_scale_enabled:
-            self._apply_auto_scale()
+            # Debounce: cancel previous pending re-render and schedule a new one
+            if hasattr(self, '_resize_timer') and self._resize_timer is not None:
+                self._resize_timer.stop()
+            from PySide6.QtCore import QTimer
+            self._resize_timer = QTimer()
+            self._resize_timer.setSingleShot(True)
+            self._resize_timer.timeout.connect(self._apply_auto_scale)
+            self._resize_timer.start(30)  # 30ms debounce
 
     def showEvent(self, event):
         """Handle window show event to set focus to graphics view."""
