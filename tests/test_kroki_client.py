@@ -68,3 +68,17 @@ class TestKrokiClient:
         assert isinstance(result, bytes)
         assert len(result) > 0
         assert b"<svg" in result
+
+
+def test_kroki_error_is_importable():
+    """KrokiError should be importable from kroki_client module."""
+    from dacwatch.kroki_client import KrokiError
+    assert issubclass(KrokiError, Exception)
+
+def test_kroki_error_has_attributes():
+    from dacwatch.kroki_client import KrokiError
+    err = KrokiError(400, "Bad Request", "syntax error in diagram")
+    assert err.status == 400
+    assert err.reason == "Bad Request"
+    assert err.body == "syntax error in diagram"
+    assert "400" in str(err)

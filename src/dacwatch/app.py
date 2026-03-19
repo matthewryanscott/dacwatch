@@ -2,13 +2,14 @@ import asyncio
 from typing import Optional
 from queue import Queue
 import threading
+import aiohttp
 from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import QTimer, Qt
 from pathlib import Path
 from .config import Config
 from .file_watcher import FileWatcher
 from .window_manager import WindowManager
-from .kroki_client import KrokiClient
+from .kroki_client import KrokiClient, KrokiError
 from .markdown_parser import is_markdown_file, extract_diagram_blocks
 
 # Diagram types whose SVG uses <foreignObject> (unsupported by Qt's QSvgRenderer)
@@ -231,69 +232,33 @@ class DaCWatchApp:
     async def _render_and_display(self, source: str, diagram_type: str, window, format: str = "svg"):
         """Render diagram source and display it in the window."""
         if not self.kroki_client:
-            print(f"Kroki client not available")
             return
 
         try:
-            # Render the diagram with specified format
             image_data = await self.kroki_client.render_diagram(source, diagram_type, format)
-
-            # Store the source and image data on the window for toolbar actions
             window.image_data = image_data
             window.source_code = source
             window.current_format = format
-
-            # Display the image
             window.display_image(image_data, format)
 
-        except Exception as e:
-            print(f"Error rendering diagram: {e}")
-            # Parse error message for better user display
-            error_msg = str(e)
-            error_details = ""
-
-            # Extract detailed error information if available
-            try:
-                if hasattr(e, 'message'):
-                    error_details = str(getattr(e, 'message', ''))
-                elif hasattr(e, 'args') and len(e.args) > 0:
-                    error_details = str(e.args[0])
-                else:
-                    error_details = error_msg
-            except:
-                error_details = error_msg
-
-            # Extract raw error response body if available (for textarea)
-            error_body = ""
-            try:
-                if hasattr(e, 'body'):
-                    error_body = str(getattr(e, 'body', ''))
-                elif "Error details:" in error_details:
-                    # Extract just the response part
-                    parts = error_details.split("Error details:")
-                    if len(parts) > 1:
-                        error_body = parts[1].strip()
-                else:
-                    error_body = error_details
-            except:
-                error_body = error_msg
-
-            if "400" in error_msg or "Bad Request" in error_msg:
-                # Extract syntax error details from Kroki response
-                main_msg = "Diagram syntax error"
-                details = "The diagram contains invalid syntax. Please check your diagram code for errors."
-                window.display_error(main_msg, details, error_body)
-
-            elif "500" in error_msg:
+        except KrokiError as e:
+            if e.status == 400:
+                window.display_error("Diagram syntax error",
+                    "The diagram contains invalid syntax.", e.body)
+            elif e.status >= 500:
                 window.display_error("Server error",
-                    "The Kroki service encountered an error. Please try again later.", error_body)
-
-            elif "timeout" in error_msg.lower() or "connection" in error_msg.lower():
-                kroki_url = self.config.kroki_base if hasattr(self.config, 'kroki_base') else "Kroki service"
-                window.display_error("Network error",
-                    f"Could not connect to Kroki service: {kroki_url}", error_body)
+                    "The Kroki service encountered an error.", e.body)
             else:
-                window.display_error("Rendering error", "Unexpected error occurred.", error_body)
+                window.display_error("Rendering error",
+                    f"Kroki returned status {e.status}.", e.body)
+
+        except (aiohttp.ClientError, TimeoutError, OSError) as e:
+            window.display_error("Network error",
+                f"Could not connect to {self.config.kroki_base}", str(e))
+
+        except Exception as e:
+            window.display_error("Rendering error",
+                "Unexpected error occurred.", str(e))
 
 
 

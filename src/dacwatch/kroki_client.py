@@ -3,6 +3,16 @@ from typing import Optional
 from pathlib import Path
 
 
+class KrokiError(Exception):
+    """Error from the Kroki rendering service."""
+    def __init__(self, status: int, reason: str, body: str, url: str = ""):
+        self.status = status
+        self.reason = reason
+        self.body = body
+        self.url = url
+        super().__init__(f"{status}, message='{reason}', url='{url}'")
+
+
 class KrokiClient:
     """Client for interacting with Kroki diagram rendering service."""
 
@@ -67,14 +77,6 @@ class KrokiClient:
                     # Get raw error response body for textarea display
                     error_body = await response.text()
                     
-                    # Create a custom exception that includes the raw response body
-                    class KrokiError(Exception):
-                        def __init__(self, status, reason, body):
-                            self.status = status
-                            self.reason = reason
-                            self.body = body
-                            super().__init__(f"{status}, message='{reason}', url='{url}'")
-                    
-                    raise KrokiError(response.status, response.reason, error_body)
+                    raise KrokiError(response.status, response.reason, error_body, url=url)
                 
                 return await response.read()
