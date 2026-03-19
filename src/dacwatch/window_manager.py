@@ -145,9 +145,10 @@ class DiagramWindow(QMainWindow):
             self.is_first_display = False
         
         # Auto-fit window to diagram if this is the first display or after reappearing
-        if self.should_auto_fit and self.isVisible():
+        # Skip auto-fit when auto-scale is enabled — auto-scale fits the diagram
+        # to the current window size, so resizing the window would be wrong.
+        if self.should_auto_fit and not self.zoom.auto_scale_enabled and self.isVisible():
             self.should_auto_fit = False
-            from PySide6.QtCore import QTimer
             def auto_fit_after_display():
                 try:
                     self.fit_to_diagram()
@@ -627,8 +628,12 @@ class DiagramWindow(QMainWindow):
         """Resize the window to fit the diagram exactly with no scrollbars."""
         if not hasattr(self, 'pixmap_item') or self.pixmap_item is None:
             return
-        
-        # Check if graphics view exists and is not deleted    
+
+        # Don't resize window while auto-scale is active
+        if self.zoom.auto_scale_enabled:
+            return
+
+        # Check if graphics view exists and is not deleted
         if not hasattr(self, 'graphics_view') or self.graphics_view is None:
             return
             
