@@ -66,6 +66,40 @@ class DiagramWindow(QMainWindow):
         # Setup toast notification
         self.toast = ToastWidget(self)
 
+    def _schedule_focus(self):
+        """Schedule focus to graphics view after UI updates settle."""
+        if not hasattr(self, 'graphics_view') or not self.graphics_view:
+            return
+        def _set():
+            try:
+                if self.graphics_view:
+                    self.graphics_view.setFocus()
+            except (RuntimeError, AttributeError):
+                pass
+        QTimer.singleShot(50, _set)
+
+    def _replace_content(self, new_widget):
+        """Replace the current central content widget (graphics view or error)."""
+        central_widget = self.centralWidget()
+        if not central_widget:
+            return
+        layout = central_widget.layout()
+        if not layout:
+            return
+        if self.loading_label and self.loading_label.isVisible():
+            layout.removeWidget(self.loading_label)
+            self.loading_label.hide()
+        for attr in ('graphics_view', 'error_widget'):
+            old = getattr(self, attr, None)
+            if old is not None:
+                try:
+                    layout.removeWidget(old)
+                    old.deleteLater()
+                except (RuntimeError, AttributeError):
+                    pass
+                setattr(self, attr, None)
+        layout.addWidget(new_widget)
+
     def display_image(self, image_data: bytes, format: str):
         """
         Display rendered diagram image in the window using QScrollArea.
@@ -137,35 +171,7 @@ class DiagramWindow(QMainWindow):
                 self.png_radio.setChecked(True)
 
         # Replace loading label or existing image with graphics view
-        central_widget = self.centralWidget()
-        if central_widget:
-            layout = central_widget.layout()
-            if layout:
-                # Remove loading label on first display
-                if self.loading_label and self.loading_label.isVisible():
-                    layout.removeWidget(self.loading_label)
-                    self.loading_label.hide()
-                
-                # Remove existing graphics view if present
-                if hasattr(self, 'graphics_view') and self.graphics_view is not None:
-                    try:
-                        layout.removeWidget(self.graphics_view)
-                        self.graphics_view.deleteLater()
-                        self.graphics_view = None  # Clear reference immediately
-                    except (RuntimeError, AttributeError):
-                        pass
-                
-                # Remove existing error widget if present
-                if hasattr(self, 'error_widget') and self.error_widget is not None:
-                    try:
-                        layout.removeWidget(self.error_widget)
-                        self.error_widget.deleteLater()
-                        self.error_widget = None  # Clear reference immediately
-                    except (RuntimeError, AttributeError):
-                        pass
-                
-                # Add new graphics view
-                layout.addWidget(graphics_view)
+        self._replace_content(graphics_view)
 
         # Store references
         self.graphics_view = graphics_view
@@ -179,22 +185,14 @@ class DiagramWindow(QMainWindow):
             QTimer.singleShot(50, self._do_apply_auto_scale)
 
         # Set focus to the graphics view for keyboard navigation
-        # Use a small delay to ensure focus is set after all other UI updates complete
-        from PySide6.QtCore import QTimer
         graphics_view.setFocus()
-        
+
         # Set tab order to ensure graphics view is first in tab order
         if hasattr(self, 'svg_radio') and self.svg_radio:
             self.setTabOrder(graphics_view, self.svg_radio)
-        
+
         # Use a delayed focus set to override any competing focus attempts
-        def safe_set_focus():
-            try:
-                if hasattr(self, 'graphics_view') and self.graphics_view:
-                    self.graphics_view.setFocus()
-            except (RuntimeError, AttributeError):
-                pass  # Widget may have been deleted
-        QTimer.singleShot(50, safe_set_focus)
+        self._schedule_focus()
         
         # Disable Copy Error button when displaying successful images
         if hasattr(self, 'copy_error_button'):
@@ -290,33 +288,7 @@ class DiagramWindow(QMainWindow):
         # NO white background for error widget - use default system background
 
         # Replace loading label or existing content with error widget
-        central_widget = self.centralWidget()
-        if central_widget:
-            layout = central_widget.layout()
-            if layout:
-                # Remove loading label if visible
-                if self.loading_label and self.loading_label.isVisible():
-                    layout.removeWidget(self.loading_label)
-                    self.loading_label.hide()
-                
-                # Remove existing graphics view if present (legacy scroll area support)
-                if hasattr(self, 'graphics_view') and self.graphics_view is not None:
-                    try:
-                        layout.removeWidget(self.graphics_view)
-                        self.graphics_view.deleteLater()
-                    except (RuntimeError, AttributeError):
-                        pass
-                
-                # Remove existing error widget if present (to prevent stacking)
-                if hasattr(self, 'error_widget') and self.error_widget is not None:
-                    try:
-                        layout.removeWidget(self.error_widget)
-                        self.error_widget.deleteLater()
-                    except (RuntimeError, AttributeError):
-                        pass
-                
-                # Add new error widget
-                layout.addWidget(error_widget)
+        self._replace_content(error_widget)
 
         # Store error widget reference for cleanup
         self.error_widget = error_widget
@@ -476,16 +448,7 @@ class DiagramWindow(QMainWindow):
         self.show()
         
         # Set focus to graphics view if it exists
-        # Use a small delay to ensure focus is set after all other UI updates
-        if hasattr(self, 'graphics_view') and self.graphics_view:
-            from PySide6.QtCore import QTimer
-            def safe_set_focus():
-                try:
-                    if hasattr(self, 'graphics_view') and self.graphics_view:
-                        self.graphics_view.setFocus()
-                except (RuntimeError, AttributeError):
-                    pass
-            QTimer.singleShot(50, safe_set_focus)
+        self._schedule_focus()
 
     def _handle_auto_scale(self, checked: bool):
         """Handle auto scale toggle."""
@@ -730,16 +693,7 @@ class DiagramWindow(QMainWindow):
         super().showEvent(event)
         
         # Set focus to graphics view for keyboard navigation
-        # Use a small delay to ensure focus is set after all other UI updates
-        if hasattr(self, 'graphics_view') and self.graphics_view:
-            from PySide6.QtCore import QTimer
-            def safe_set_focus():
-                try:
-                    if hasattr(self, 'graphics_view') and self.graphics_view:
-                        self.graphics_view.setFocus()
-                except (RuntimeError, AttributeError):
-                    pass
-            QTimer.singleShot(50, safe_set_focus)
+        self._schedule_focus()
     
     def hideEvent(self, event):
         """Handle window hide event to prepare for auto-fit on reappear."""
@@ -751,16 +705,7 @@ class DiagramWindow(QMainWindow):
         """Handle window focus event to set focus to graphics view."""
         super().focusInEvent(event)
         # Set focus to graphics view for keyboard navigation
-        # Use a small delay to ensure focus is set after all other UI updates
-        if hasattr(self, 'graphics_view') and self.graphics_view:
-            from PySide6.QtCore import QTimer
-            def safe_set_focus():
-                try:
-                    if hasattr(self, 'graphics_view') and self.graphics_view:
-                        self.graphics_view.setFocus()
-                except (RuntimeError, AttributeError):
-                    pass
-            QTimer.singleShot(50, safe_set_focus)
+        self._schedule_focus()
 
     def closeEvent(self, event):
         """Handle window close event to clean up from window manager."""
