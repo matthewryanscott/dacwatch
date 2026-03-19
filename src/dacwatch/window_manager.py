@@ -93,6 +93,9 @@ class ZoomableGraphicsView(QGraphicsView):
 
     def gestureEvent(self, event):
         """Handle pinch gesture for touch zoom."""
+        # Disable pinch zoom when auto scale is active
+        if self.parent_window and getattr(self.parent_window, 'auto_scale_enabled', False):
+            return True
         gesture = event.gesture(Qt.GestureType.PinchGesture)
         if gesture:
             if gesture.state() == Qt.GestureState.GestureUpdated:
@@ -238,6 +241,7 @@ class DiagramWindow(QMainWindow):
         self.current_zoom_scale: float = 1.0  # Store current zoom level
         self.is_first_display: bool = True  # Track if this is the first image display
         self.should_auto_fit: bool = True  # Track if window should auto-fit on next image display
+        self.auto_scale_enabled: bool = False  # Track auto-scale mode
         self._setup_ui()
 
     def _setup_ui(self):
@@ -426,7 +430,14 @@ class DiagramWindow(QMainWindow):
         self.graphics_view = graphics_view
         self.graphics_scene = graphics_scene
         self.pixmap_item = pixmap_item
-        
+
+        # Apply auto scale mode if enabled
+        if self.auto_scale_enabled:
+            graphics_view.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+            graphics_view.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+            from PySide6.QtCore import QTimer
+            QTimer.singleShot(50, self._apply_auto_scale)
+
         # Set focus to the graphics view for keyboard navigation
         # Use a small delay to ensure focus is set after all other UI updates complete
         from PySide6.QtCore import QTimer
@@ -626,6 +637,9 @@ class DiagramWindow(QMainWindow):
         if sys.platform == 'darwin':
             toolbar.addAction(self.always_on_top_action)
 
+        # Auto scale toggle
+        toolbar.addAction(self.auto_scale_action)
+
         # Create format selection radio buttons
         from PySide6.QtWidgets import QLabel, QRadioButton, QHBoxLayout, QWidget, QButtonGroup
         
@@ -712,6 +726,12 @@ class DiagramWindow(QMainWindow):
         self.always_on_top_action.setChecked(False)  # Default to off
         self.always_on_top_action.triggered.connect(self._handle_always_on_top)
 
+        # Auto scale action - scales diagram to fit window
+        self.auto_scale_action = QAction("Auto scale", self)
+        self.auto_scale_action.setCheckable(True)
+        self.auto_scale_action.setChecked(False)
+        self.auto_scale_action.triggered.connect(self._handle_auto_scale)
+
     def _handle_always_on_top(self, checked: bool):
         """Handle always on top toggle with clean state management."""
         if checked:
@@ -735,6 +755,39 @@ class DiagramWindow(QMainWindow):
                 except (RuntimeError, AttributeError):
                     pass
             QTimer.singleShot(50, safe_set_focus)
+
+    def _handle_auto_scale(self, checked: bool):
+        """Handle auto scale toggle."""
+        self.auto_scale_enabled = checked
+        if hasattr(self, 'graphics_view') and self.graphics_view:
+            if checked:
+                # Hide scrollbars and fit diagram to viewport
+                self.graphics_view.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+                self.graphics_view.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+                self._apply_auto_scale()
+            else:
+                # Restore scrollbars and zoom level
+                self.graphics_view.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+                self.graphics_view.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+                self._update_zoom_label()
+
+    def _apply_auto_scale(self):
+        """Fit the diagram to the current viewport, maintaining aspect ratio."""
+        if not self.auto_scale_enabled:
+            return
+        if not hasattr(self, 'graphics_view') or not self.graphics_view:
+            return
+        if not hasattr(self, 'pixmap_item') or not self.pixmap_item:
+            return
+        try:
+            scene_rect = self.graphics_view.scene().itemsBoundingRect()
+            if not scene_rect.isNull():
+                self.graphics_view.resetTransform()
+                self.graphics_view.fitInView(scene_rect, Qt.AspectRatioMode.KeepAspectRatio)
+                self.current_zoom_scale = self.graphics_view.get_current_scale()
+                self._update_zoom_label()
+        except (RuntimeError, AttributeError):
+            pass
 
     def _setup_shortcuts(self):
         """Setup keyboard shortcuts."""
@@ -789,6 +842,10 @@ class DiagramWindow(QMainWindow):
         # Fit to diagram (F key)
         fit_shortcut = QShortcut(QKeySequence("F"), self)
         fit_shortcut.activated.connect(self.fit_to_diagram)
+
+        # Toggle auto scale (S key)
+        auto_scale_shortcut = QShortcut(QKeySequence("S"), self)
+        auto_scale_shortcut.activated.connect(lambda: self.auto_scale_action.trigger())
 
         # Note: Window cycling shortcuts (Cmd+] and Cmd+[) are registered at the
         # application level in app.py to ensure they work across all windows
@@ -930,6 +987,8 @@ class DiagramWindow(QMainWindow):
 
     def zoom_in(self):
         """Zoom in on the image."""
+        if self.auto_scale_enabled:
+            return
         if hasattr(self, 'graphics_view') and self.graphics_view:
             try:
                 self.graphics_view.scale(1.25, 1.25)
@@ -941,6 +1000,8 @@ class DiagramWindow(QMainWindow):
 
     def zoom_out(self):
         """Zoom out on the image."""
+        if self.auto_scale_enabled:
+            return
         if hasattr(self, 'graphics_view') and self.graphics_view:
             try:
                 self.graphics_view.scale(0.8, 0.8)
@@ -952,6 +1013,8 @@ class DiagramWindow(QMainWindow):
 
     def reset_zoom(self):
         """Reset zoom to 1:1 pixel ratio (no scaling)."""
+        if self.auto_scale_enabled:
+            return
         if hasattr(self, 'graphics_view') and self.graphics_view:
             try:
                 self.graphics_view.reset_zoom()
@@ -1014,6 +1077,12 @@ class DiagramWindow(QMainWindow):
         except (RuntimeError, AttributeError):
             # Graphics view or pixmap might have been deleted
             pass
+
+    def resizeEvent(self, event):
+        """Handle window resize to re-apply auto scale."""
+        super().resizeEvent(event)
+        if self.auto_scale_enabled:
+            self._apply_auto_scale()
 
     def showEvent(self, event):
         """Handle window show event to set focus to graphics view."""
