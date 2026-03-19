@@ -380,7 +380,8 @@ class TestDiagramWindowImageDisplay:
 
     def test_display_image_svg_format(self, qtbot):
         """Test displaying SVG image data using real Qt widgets."""
-        from dacwatch.window_manager import DiagramWindow, ZoomableGraphicsView
+        from dacwatch.window_manager import DiagramWindow
+        from dacwatch.graphics_view import ZoomableGraphicsView
         from PySide6.QtWidgets import QGraphicsScene
 
         # Create a real DiagramWindow
@@ -412,7 +413,8 @@ class TestDiagramWindowImageDisplay:
 
     def test_display_image_png_format(self, qtbot):
         """Test displaying PNG image data using real Qt widgets."""
-        from dacwatch.window_manager import DiagramWindow, ZoomableGraphicsView
+        from dacwatch.window_manager import DiagramWindow
+        from dacwatch.graphics_view import ZoomableGraphicsView
 
         # Create a real DiagramWindow
         window = DiagramWindow("/test/path.png")
@@ -436,7 +438,8 @@ class TestDiagramWindowImageDisplay:
 
     def test_display_image_replaces_loading_label(self, qtbot):
         """Test that display_image replaces the loading label with graphics view."""
-        from dacwatch.window_manager import DiagramWindow, ZoomableGraphicsView
+        from dacwatch.window_manager import DiagramWindow
+        from dacwatch.graphics_view import ZoomableGraphicsView
 
         # Create a real DiagramWindow
         window = DiagramWindow("/test/path.svg")
@@ -460,7 +463,8 @@ class TestDiagramWindowImageDisplay:
 
     def test_display_image_handles_empty_data(self, qtbot):
         """Test display_image handles empty image data gracefully."""
-        from dacwatch.window_manager import DiagramWindow, ZoomableGraphicsView
+        from dacwatch.window_manager import DiagramWindow
+        from dacwatch.graphics_view import ZoomableGraphicsView
 
         # Create a real DiagramWindow
         window = DiagramWindow("/test/path.svg")
@@ -890,7 +894,8 @@ class TestDiagramWindowToolbar:
 
     def test_keyboard_focus_on_graphics_view(self, qtbot):
         """Test that keyboard focus is set to graphics view when window is shown."""
-        from dacwatch.window_manager import DiagramWindow, ZoomableGraphicsView
+        from dacwatch.window_manager import DiagramWindow
+        from dacwatch.graphics_view import ZoomableGraphicsView
         from PySide6.QtCore import Qt
         from PySide6.QtWidgets import QApplication
         
@@ -1678,7 +1683,8 @@ class TestZoomableGraphicsViewDoubleClick:
 
     def test_double_click_triggers_fit_action(self, qtbot):
         """Test that double-clicking on the graphics view triggers the fit action."""
-        from dacwatch.window_manager import DiagramWindow, ZoomableGraphicsView
+        from dacwatch.window_manager import DiagramWindow
+        from dacwatch.graphics_view import ZoomableGraphicsView
         from PySide6.QtCore import Qt, QPoint
         from PySide6.QtGui import QMouseEvent
         from unittest.mock import Mock, patch
@@ -1722,7 +1728,8 @@ class TestZoomableGraphicsViewDoubleClick:
 
     def test_double_click_ignores_non_left_button(self, qtbot):
         """Test that double-clicking with non-left buttons doesn't trigger fit action."""
-        from dacwatch.window_manager import DiagramWindow, ZoomableGraphicsView
+        from dacwatch.window_manager import DiagramWindow
+        from dacwatch.graphics_view import ZoomableGraphicsView
         from PySide6.QtCore import Qt, QPoint
         from PySide6.QtGui import QMouseEvent
         from unittest.mock import Mock, patch
@@ -1761,7 +1768,7 @@ class TestZoomableGraphicsViewDoubleClick:
 
     def test_double_click_handles_deleted_parent_window(self, qtbot):
         """Test that double-click gracefully handles deleted parent window."""
-        from dacwatch.window_manager import ZoomableGraphicsView
+        from dacwatch.graphics_view import ZoomableGraphicsView
         from PySide6.QtCore import Qt, QPoint
         from PySide6.QtGui import QMouseEvent
         from unittest.mock import Mock
@@ -1792,7 +1799,7 @@ class TestZoomableGraphicsViewDoubleClick:
 
     def test_double_click_without_parent_window(self, qtbot):
         """Test that double-click works safely when there's no parent window."""
-        from dacwatch.window_manager import ZoomableGraphicsView
+        from dacwatch.graphics_view import ZoomableGraphicsView
         from PySide6.QtCore import Qt, QPoint
         from PySide6.QtGui import QMouseEvent
         
