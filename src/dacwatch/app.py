@@ -32,7 +32,8 @@ class DaCWatchApp:
     async def start(self):
         """Start the application."""
         self.is_running = True
-        print(f"DaCWatch starting - watching directory: {self.config.directory}")
+        dirs = ", ".join(str(d) for d in self.config.directories)
+        print(f"DaCWatch starting - watching directories: {dirs}")
         print(f"Using Kroki service: {self.config.kroki_base}")
 
         # Initialize Qt application with high-DPI support
@@ -257,8 +258,9 @@ class DaCWatchApp:
                 f"Could not connect to {self.config.kroki_base}", str(e))
 
         except Exception as e:
+            import traceback
             window.display_error("Rendering error",
-                "Unexpected error occurred.", str(e))
+                "Unexpected error occurred.", traceback.format_exc())
 
 
 

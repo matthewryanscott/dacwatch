@@ -14,9 +14,9 @@ def test_config_creation(tmp_path):
     directory.mkdir()
     kroki_base = "https://kroki.io"
 
-    config = Config(directory=directory, kroki_base=kroki_base)
+    config = Config(directories=[directory], kroki_base=kroki_base)
 
-    assert config.directory == directory
+    assert config.directories == [directory]
     assert config.kroki_base == kroki_base
 
 
@@ -25,9 +25,9 @@ def test_config_default_kroki_base(tmp_path):
     directory = tmp_path / "test_dir"
     directory.mkdir()
 
-    config = Config(directory=directory)
+    config = Config(directories=[directory])
 
-    assert config.directory == directory
+    assert config.directories == [directory]
     assert config.kroki_base == "http://localhost:48000"
 
 
@@ -44,12 +44,12 @@ def test_config_validation_kroki_base_url(tmp_path):
     directory.mkdir()
 
     # Valid URL
-    config = Config(directory=directory, kroki_base="https://custom.kroki.io")
+    config = Config(directories=[directory], kroki_base="https://custom.kroki.io")
     assert config.kroki_base == "https://custom.kroki.io"
 
     # Invalid URL should raise ValueError
     with pytest.raises(ValueError):
-        Config(directory=directory, kroki_base="not-a-url")
+        Config(directories=[directory], kroki_base="not-a-url")
 
 
 def test_config_from_cli_args(tmp_path):
@@ -58,7 +58,7 @@ def test_config_from_cli_args(tmp_path):
     directory.mkdir()
     kroki_base = "https://kroki.io"
 
-    config = Config.from_cli_args(directory, kroki_base)
+    config = Config.from_cli_args([directory], kroki_base)
 
-    assert config.directory == directory
+    assert config.directories == [directory]
     assert config.kroki_base == kroki_base

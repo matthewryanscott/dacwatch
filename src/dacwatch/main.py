@@ -9,17 +9,18 @@ app = typer.Typer(name="dacwatch", help="DaCWatch - Diagram as Code File Watcher
 
 @app.command(name="dacwatch")
 def main(
-    directory: Path = typer.Argument(..., help="Directory to watch for diagram files"),
+    directories: list[Path] = typer.Argument(..., help="Directories to watch for diagram files"),
     kroki_base: str = typer.Option("http://localhost:48000", help="Kroki service base URL"),
     dry_run: bool = typer.Option(False, help="Dry run - validate config and exit"),
 ):
     """
-    Watch a directory for diagram files and render them using Kroki service.
+    Watch directories for diagram files and render them using Kroki service.
     """
     # Create configuration from CLI arguments
-    config = Config.from_cli_args(directory, kroki_base)
+    config = Config.from_cli_args(directories, kroki_base)
 
-    typer.echo(f"Watching directory: {config.directory}")
+    for d in config.directories:
+        typer.echo(f"Watching directory: {d}")
     typer.echo(f"Using Kroki service: {config.kroki_base}")
 
     if dry_run:

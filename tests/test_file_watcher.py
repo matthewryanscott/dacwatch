@@ -16,7 +16,7 @@ async def test_file_watcher_initialization(tmp_path):
     """Test file watcher initializes correctly."""
     directory = tmp_path / "test_dir"
     directory.mkdir()
-    config = Config(directory=directory)
+    config = Config(directories=[directory])
 
     watcher = FileWatcher(config)
 
@@ -29,7 +29,7 @@ async def test_file_watcher_start_stop(tmp_path):
     """Test file watcher can start and stop."""
     directory = tmp_path / "test_dir"
     directory.mkdir()
-    config = Config(directory=directory)
+    config = Config(directories=[directory])
 
     watcher = FileWatcher(config)
 
@@ -47,7 +47,7 @@ async def test_file_watcher_observer_setup(tmp_path):
     """Test file watcher sets up observer correctly."""
     directory = tmp_path / "test_dir"
     directory.mkdir()
-    config = Config(directory=directory)
+    config = Config(directories=[directory])
 
     watcher = FileWatcher(config)
     await watcher.start()
@@ -66,7 +66,7 @@ async def test_file_watcher_event_handling(tmp_path):
     """Test file watcher handles file events."""
     directory = tmp_path / "test_dir"
     directory.mkdir()
-    config = Config(directory=directory)
+    config = Config(directories=[directory])
 
     watcher = FileWatcher(config)
 
@@ -90,7 +90,7 @@ async def test_file_watcher_ignores_unsupported_files(tmp_path):
     """Test file watcher ignores unsupported file types."""
     directory = tmp_path / "test_dir"
     directory.mkdir()
-    config = Config(directory=directory)
+    config = Config(directories=[directory])
 
     watcher = FileWatcher(config)
 
@@ -113,7 +113,7 @@ async def test_file_watcher_handles_multiple_file_types(tmp_path):
     """Test file watcher handles different supported file types."""
     directory = tmp_path / "test_dir"
     directory.mkdir()
-    config = Config(directory=directory)
+    config = Config(directories=[directory])
 
     watcher = FileWatcher(config)
 
@@ -152,7 +152,7 @@ async def test_file_watcher_handles_file_modification(tmp_path):
     """Test file watcher handles file modification events."""
     directory = tmp_path / "test_dir"
     directory.mkdir()
-    config = Config(directory=directory)
+    config = Config(directories=[directory])
 
     watcher = FileWatcher(config)
 
@@ -174,7 +174,7 @@ async def test_file_watcher_handles_file_deletion(tmp_path):
     """Test file watcher handles file deletion events."""
     directory = tmp_path / "test_dir"
     directory.mkdir()
-    config = Config(directory=directory)
+    config = Config(directories=[directory])
 
     watcher = FileWatcher(config)
 
@@ -195,7 +195,7 @@ async def test_file_watcher_filters_directory_events(tmp_path):
     """Test file watcher ignores directory events."""
     directory = tmp_path / "test_dir"
     directory.mkdir()
-    config = Config(directory=directory)
+    config = Config(directories=[directory])
 
     watcher = FileWatcher(config)
 
@@ -219,7 +219,7 @@ async def test_file_watcher_case_insensitive_extensions(tmp_path):
     """Test file watcher handles case-insensitive extensions."""
     directory = tmp_path / "test_dir"
     directory.mkdir()
-    config = Config(directory=directory)
+    config = Config(directories=[directory])
 
     watcher = FileWatcher(config)
 
@@ -251,7 +251,7 @@ async def test_file_watcher_event_queue_debouncing(tmp_path):
     """Test file watcher debounces rapid events."""
     directory = tmp_path / "test_dir"
     directory.mkdir()
-    config = Config(directory=directory)
+    config = Config(directories=[directory])
 
     watcher = FileWatcher(config)
 
@@ -287,7 +287,7 @@ async def test_file_watcher_multiple_files(tmp_path):
     """Test file watcher handles events for multiple files."""
     directory = tmp_path / "test_dir"
     directory.mkdir()
-    config = Config(directory=directory)
+    config = Config(directories=[directory])
 
     watcher = FileWatcher(config)
     await watcher.start()
@@ -321,7 +321,7 @@ async def test_file_watcher_event_flattening_created_modified(tmp_path):
     """Test that {created, modified} events are flattened to {created}."""
     directory = tmp_path / "test_dir"
     directory.mkdir()
-    config = Config(directory=directory)
+    config = Config(directories=[directory])
 
     watcher = FileWatcher(config)
     await watcher.start()
@@ -353,7 +353,7 @@ async def test_file_watcher_event_flattening_modified_deleted(tmp_path):
     """Test that {modified, deleted} events are flattened to {deleted}."""
     directory = tmp_path / "test_dir"
     directory.mkdir()
-    config = Config(directory=directory)
+    config = Config(directories=[directory])
 
     watcher = FileWatcher(config)
     await watcher.start()
@@ -385,7 +385,7 @@ async def test_file_watcher_event_flattening_created_deleted(tmp_path):
     """Test that {created, deleted} events are flattened to {deleted}."""
     directory = tmp_path / "test_dir"
     directory.mkdir()
-    config = Config(directory=directory)
+    config = Config(directories=[directory])
 
     watcher = FileWatcher(config)
     await watcher.start()
@@ -417,7 +417,7 @@ def test_file_watcher_flatten_events_method(tmp_path):
     from dacwatch.file_watcher import FileWatcher
     from dacwatch.config import Config
 
-    config = Config(directory=tmp_path)
+    config = Config(directories=[tmp_path])
     watcher = FileWatcher(config)
 
     # Create a test file that exists

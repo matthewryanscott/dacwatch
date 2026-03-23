@@ -16,7 +16,7 @@ async def test_app_initialization(tmp_path):
     """Test app initializes correctly."""
     directory = tmp_path / "test_dir"
     directory.mkdir()
-    config = Config(directory=directory)
+    config = Config(directories=[directory])
 
     app = DaCWatchApp(config)
 
@@ -29,7 +29,7 @@ async def test_app_start_stop(tmp_path):
     """Test app can start and stop."""
     directory = tmp_path / "test_dir"
     directory.mkdir()
-    config = Config(directory=directory)
+    config = Config(directories=[directory])
 
     app = DaCWatchApp(config)
 
@@ -47,7 +47,7 @@ async def test_app_run_with_timeout(tmp_path):
     """Test app run method with timeout."""
     directory = tmp_path / "test_dir"
     directory.mkdir()
-    config = Config(directory=directory)
+    config = Config(directories=[directory])
 
     app = DaCWatchApp(config)
 
@@ -74,7 +74,7 @@ async def test_qapplication_initialization_no_existing_instance(tmp_path):
     """Test QApplication initialization when no instance exists."""
     directory = tmp_path / "test_dir"
     directory.mkdir()
-    config = Config(directory=directory)
+    config = Config(directories=[directory])
 
     with patch('dacwatch.app.QApplication') as mock_qapp_class:
         mock_qapp_instance = MagicMock()
@@ -94,7 +94,7 @@ async def test_qapplication_initialization_existing_instance(tmp_path):
     """Test QApplication initialization when instance already exists."""
     directory = tmp_path / "test_dir"
     directory.mkdir()
-    config = Config(directory=directory)
+    config = Config(directories=[directory])
 
     with patch('dacwatch.app.QApplication') as mock_qapp_class:
         from PySide6.QtWidgets import QApplication
@@ -120,7 +120,7 @@ async def test_start_without_preregistering_files(tmp_path):
     (directory / "test1.dot").write_text("digraph G { A -> B; }")
     (directory / "test2.puml").write_text("@startuml\nA -> B\n@enduml")
 
-    config = Config(directory=directory)
+    config = Config(directories=[directory])
     app = DaCWatchApp(config)
 
     # Mock the window manager to track if windows are created during start
@@ -142,7 +142,7 @@ async def test_qapplication_cleanup_on_stop(tmp_path):
     """Test QApplication cleanup when app stops."""
     directory = tmp_path / "test_dir"
     directory.mkdir()
-    config = Config(directory=directory)
+    config = Config(directories=[directory])
 
     with patch('dacwatch.app.QApplication') as mock_qapp_class:
         mock_qapp_instance = MagicMock()
@@ -163,7 +163,7 @@ async def test_handle_markdown_event_created(tmp_path):
     """Test that markdown file creates windows for each diagram block."""
     directory = tmp_path / "test_dir"
     directory.mkdir()
-    config = Config(directory=directory)
+    config = Config(directories=[directory])
 
     # Create a markdown file with two diagram blocks
     md_file = directory / "test.md"
@@ -216,7 +216,7 @@ async def test_handle_markdown_event_deleted(tmp_path):
     """Test that deleting a markdown file closes all its windows."""
     directory = tmp_path / "test_dir"
     directory.mkdir()
-    config = Config(directory=directory)
+    config = Config(directories=[directory])
 
     app = DaCWatchApp(config)
     await app.start()
@@ -239,7 +239,7 @@ async def test_handle_diagram_event_still_works(tmp_path):
     """Test that regular diagram files still work after markdown changes."""
     directory = tmp_path / "test_dir"
     directory.mkdir()
-    config = Config(directory=directory)
+    config = Config(directories=[directory])
 
     dot_file = directory / "test.dot"
     dot_file.write_text("digraph G { A -> B; }")
@@ -276,7 +276,7 @@ async def test_handle_markdown_no_diagram_blocks(tmp_path):
     """Test markdown file with no diagram blocks creates no windows."""
     directory = tmp_path / "test_dir"
     directory.mkdir()
-    config = Config(directory=directory)
+    config = Config(directories=[directory])
 
     md_file = directory / "test.md"
     md_file.write_text(
@@ -304,7 +304,7 @@ async def test_render_markdown_block_format_toggle(tmp_path):
     """Test format toggle for markdown diagram block."""
     directory = tmp_path / "test_dir"
     directory.mkdir()
-    config = Config(directory=directory)
+    config = Config(directories=[directory])
 
     md_file = directory / "test.md"
     md_file.write_text(
@@ -338,7 +338,7 @@ async def test_render_markdown_block_removed(tmp_path):
     """Test format toggle when block has been removed."""
     directory = tmp_path / "test_dir"
     directory.mkdir()
-    config = Config(directory=directory)
+    config = Config(directories=[directory])
 
     md_file = directory / "test.md"
     md_file.write_text("# No diagrams\n")

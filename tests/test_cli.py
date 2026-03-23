@@ -20,7 +20,7 @@ def test_cli_help(runner):
     assert result.exit_code == 0
     assert "dacwatch" in result.output
     assert "--kroki-base" in result.output
-    assert "directory" in result.output
+    assert "directories" in result.output.lower()
     assert "--help" in result.output
     assert "Kroki service" in result.output
 

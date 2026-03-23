@@ -109,7 +109,8 @@ class FileWatcher:
         loop = asyncio.get_running_loop()
         self.event_handler = AsyncEventHandler(self, loop)
         self.observer = Observer()
-        self.observer.schedule(self.event_handler, str(self.config.directory), recursive=True)
+        for directory in self.config.directories:
+            self.observer.schedule(self.event_handler, str(directory), recursive=True)
         self.observer.start()
 
         # Start the event processing task
