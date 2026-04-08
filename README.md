@@ -167,3 +167,17 @@ DaCWatch uses `Cmd` on macOS and `Ctrl` on Linux and Windows for standard shortc
 | `Error` | Copy full Kroki error response when render fails |
 | `Fit` | Resize window to fit current diagram |
 | `Reveal` | Open source file location in platform file manager |
+
+## Development
+
+### Run tests
+```bash
+uv run pytest
+```
+
+### Headless Qt test mode
+Tests use `pytest-qt` with `QT_QPA_PLATFORM=offscreen`, so widget behavior can be exercised without opening real windows.
+
+### Current automated coverage
+- 177 collected tests across CLI, file watching, rendering, window management, clipboard, markdown parsing, and zoom behavior
+- `uv run dacwatch --help` provides the generated CLI reference
