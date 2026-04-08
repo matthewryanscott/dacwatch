@@ -1,3 +1,4 @@
+import re
 import sys
 from pathlib import Path
 from unittest.mock import AsyncMock, patch
@@ -18,15 +19,25 @@ def runner():
     return CliRunner()
 
 
+ANSI_ESCAPE_RE = re.compile(r"\x1b\[[0-9;]*m")
+
+
+def strip_ansi(text: str) -> str:
+    """Remove ANSI escape sequences from terminal output."""
+    return ANSI_ESCAPE_RE.sub("", text)
+
+
 def test_cli_help(runner):
     """Test that CLI shows help message."""
     result = runner.invoke(app, ["--help"], color=False, terminal_width=120)
+    output = strip_ansi(result.output)
+
     assert result.exit_code == 0
-    assert "dacwatch" in result.output
-    assert "Usage:" in result.output
-    assert "directories" in result.output.lower()
-    assert "--help" in result.output
-    assert "Kroki service" in result.output
+    assert "dacwatch" in output
+    assert "Usage:" in output
+    assert "directories" in output.lower()
+    assert "--help" in output
+    assert "Kroki service" in output
 
 
 def test_configure_logging_defaults_to_warning():
