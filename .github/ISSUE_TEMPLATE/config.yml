@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: DaCWatch README
+    url: https://github.com/matthewryanscott/dacwatch
+    about: Read installation, usage, and troubleshooting guidance before filing an issue.
