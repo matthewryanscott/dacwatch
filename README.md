@@ -1,4 +1,31 @@
-# DaCWatch: A Diagrams-as-Code Watching tool
+# DaCWatch: Live preview for diagrams-as-code
+
+DaCWatch watches diagram files, renders them through Kroki, and opens a desktop preview window for each diagram you create or change.
+
+## Quick start
+
+### Requirements
+- Python 3.13+
+- [uv](https://docs.astral.sh/uv/)
+- Optional: Docker, if you want a private local Kroki service
+
+### Install
+```bash
+uv sync
+```
+
+### Run with self-hosted Kroki
+```bash
+cd kroki-self-hosted
+docker compose up -d
+cd ..
+uv run dacwatch <dir> [<dir2> ...]
+```
+
+### Run with public Kroki
+```bash
+uv run dacwatch --kroki-base=https://kroki.io <dir> [<dir2> ...]
+```
 
 ## Features
 
