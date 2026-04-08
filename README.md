@@ -73,7 +73,7 @@ uv run dacwatch --kroki-base=https://kroki.io <dir> [<dir2> ...]
 
 ## Architecture
 
-- **Platform**: Cross-platform (macOS, Linux, Windows) with high-DPI display support
+- **Platform**: Desktop app designed for macOS first, with Linux and Windows support in code paths
 - **Python**: 3.13 (via uv package manager)
 - **Async Runtime**: Async Python with qasync Qt integration
 - **GUI Framework**: PySide6 with traditional QWidget (not QML or Qt Quick)
@@ -167,6 +167,12 @@ DaCWatch uses `Cmd` on macOS and `Ctrl` on Linux and Windows for standard shortc
 | `Error` | Copy full Kroki error response when render fails |
 | `Fit` | Resize window to fit current diagram |
 | `Reveal` | Open source file location in platform file manager |
+
+## Platform support
+
+- **Actively developed on**: macOS
+- **Designed to support**: Linux and Windows through Qt, Typer, and Kroki-based code paths
+- **Behavior to verify manually on non-macOS systems**: file manager reveal integration, window focus behavior, and clipboard details
 
 ## Development
 
