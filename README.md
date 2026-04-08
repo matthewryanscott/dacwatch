@@ -2,6 +2,35 @@
 
 DaCWatch watches diagram files, renders them through Kroki, and opens a desktop preview window for each diagram you create or change.
 
+## Who this is for
+
+DaCWatch is aimed at developers who:
+- already keep diagrams in source files
+- are comfortable launching a desktop app from the command line
+- want a lightweight local preview loop instead of living in a browser tab
+- use Graphviz, PlantUML, Mermaid, or Markdown docs with diagram fences
+
+This project is especially useful if you already edit diagrams in your normal editor and want the preview window to stay out of the way until something changes.
+
+## What makes it useful
+
+- **Fast feedback loop**: save a diagram file and the preview refreshes automatically
+- **Desktop-native viewing**: separate windows, keyboard shortcuts, zooming, and clipboard support
+- **Works with docs repos**: Markdown fenced diagrams are supported alongside standalone diagram files
+- **Local-first option**: point it at a self-hosted Kroki stack for privacy and speed
+
+## Alpha status
+
+DaCWatch is an **alpha-quality developer tool**.
+
+That means:
+- the core workflow is already usable
+- the codebase has automated tests and is actively being polished
+- some ergonomics and persistence features are still incomplete
+- macOS is the primary target; Linux and Windows paths exist but need more real-world validation
+
+If that tradeoff sounds acceptable, DaCWatch is ready for experimentation.
+
 ## Quick start
 
 ### Requirements
@@ -41,6 +70,21 @@ uv tool uninstall dacwatch
 ```
 
 This is especially convenient if you want DaCWatch available everywhere while still developing it from this checkout.
+
+### 30-second first run
+
+```bash
+# 1) Start the bundled local Kroki stack
+cd kroki-self-hosted
+docker compose up -d
+cd ..
+
+# 2) Watch the current directory
+uv run dacwatch .
+
+# or, if you installed the CLI globally
+# dacwatch .
+```
 
 ### Run with self-hosted Kroki
 ```bash
@@ -197,6 +241,13 @@ DaCWatch uses `Cmd` on macOS and `Ctrl` on Linux and Windows for standard shortc
 | `Error` | Copy full Kroki error response when render fails |
 | `Fit` | Resize window to fit current diagram |
 | `Reveal` | Open source file location in platform file manager |
+
+## Known rough edges
+
+- DaCWatch depends on a reachable Kroki endpoint; if Kroki is down, the app cannot render
+- Preferences are still limited, and not every user-facing setting persists yet
+- Non-macOS code paths exist, but they need more manual validation in real developer environments
+- Documentation visuals are still catching up to the current app behavior
 
 ## Platform support
 
