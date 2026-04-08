@@ -206,3 +206,13 @@ DaCWatch is already usable for day-to-day diagram previewing, but project still 
 - Preferences are not persisted yet
 - Multi-endpoint Kroki switching is not implemented yet
 - Screenshot-quality docs visuals are illustrative; final polished app capture workflow still needs manual curation
+
+## Troubleshooting
+
+| Problem | What to check |
+| --- | --- |
+| No preview window appears | Confirm file extension or Markdown fence language is supported and file lives under watched directory |
+| Error window appears | Check Kroki endpoint availability and copy error output from toolbar for exact response |
+| Public Kroki feels slow | Switch to local Docker-backed Kroki on `http://localhost:48000` |
+| Reveal action behaves differently by OS | Verify local file manager integration on your platform |
+| Clipboard output looks blurry | Use PNG or white-background copy mode and test target app's paste behavior |
