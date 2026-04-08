@@ -40,10 +40,16 @@ uv run dacwatch --kroki-base=https://kroki.io <dir> [<dir2> ...]
 
 ### File Watching
 - Watch multiple directories for changes
-- Watches for GraphViz (`.dot`), PlantUML (`.puml`, `.plantuml`), Mermaid (`.mermaid`)
-- If a new one is created or modified, opens a new window for that diagram if not already opened
-- If a diagram is modified, re-renders it in same window if already opened
-- If a diagram is deleted, closes its window if open
+- Watches Graphviz (`.dot`), PlantUML (`.puml`, `.plantuml`), Mermaid (`.mermaid`), and Markdown files with supported diagram fences
+- Opens a new preview window when a new diagram appears
+- Re-renders an existing preview window when a watched diagram changes
+- Closes the preview window when the source diagram is deleted
+
+### What happens when a file changes
+1. Create or edit a supported diagram file in any watched directory.
+2. DaCWatch detects the change and sends diagram source to Kroki.
+3. DaCWatch opens a new preview window or refreshes the existing one.
+4. Delete the source file and DaCWatch closes that preview window.
 
 ### Diagram Rendering
 - Uses a Kroki service to render diagrams as SVG or PNG
