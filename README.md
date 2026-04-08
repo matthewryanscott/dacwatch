@@ -216,3 +216,7 @@ DaCWatch is already usable for day-to-day diagram previewing, but project still 
 | Public Kroki feels slow | Switch to local Docker-backed Kroki on `http://localhost:48000` |
 | Reveal action behaves differently by OS | Verify local file manager integration on your platform |
 | Clipboard output looks blurry | Use PNG or white-background copy mode and test target app's paste behavior |
+
+## License
+
+MIT. See [LICENSE](LICENSE).

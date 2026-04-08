@@ -7,6 +7,7 @@ name = "dacwatch"
 version = "0.1.0"
 description = "DaCWatch - Diagram as Code File Watcher"
 readme = "README.md"
+license = "MIT"
 requires-python = ">=3.13"
 dependencies = [
     "aiohttp>=3.12.15",
