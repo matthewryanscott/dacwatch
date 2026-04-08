@@ -131,34 +131,37 @@ If you prefer not to run Docker, you can use the public Kroki endpoint:
 uv run dacwatch --kroki-base=https://kroki.io <dir> [<dir2> ...]
 ```
 
-### Keyboard Shortcuts
+### Keyboard shortcuts
 
-#### Window Management
-- **Cmd-W / Ctrl-W**: Close the active diagram window
-- **Cmd-Shift-] / Ctrl-Shift-]**: Cycle to next window
-- **Cmd-Shift-[ / Ctrl-Shift-[**: Cycle to previous window
-- **Cmd-T / Ctrl-T**: Toggle always-on-top mode
-- **Cmd-R / Ctrl-R**: Reveal file in file manager
+DaCWatch uses `Cmd` on macOS and `Ctrl` on Linux and Windows for standard shortcuts.
 
-#### Viewing & Navigation
-- **Cmd-+ / Ctrl-+**: Zoom in
-- **Cmd-- / Ctrl--**: Zoom out
-- **Cmd-0 / Ctrl-0**: Reset zoom to 100%
-- **F**: Fit window to diagram size
-- **Double-click**: Fit window to diagram size
-- **Pinch gesture**: Zoom in/out (trackpad)
+| Area | Shortcut | Action |
+| --- | --- | --- |
+| Window management | `Cmd/Ctrl+W` | Close active preview window |
+| Window management | `Cmd/Ctrl+Shift+]` | Cycle to next preview window |
+| Window management | `Cmd/Ctrl+Shift+[` | Cycle to previous preview window |
+| Window management | `Cmd/Ctrl+T` | Toggle always-on-top on macOS |
+| Window management | `Cmd/Ctrl+R` | Reveal source file in file manager |
+| Viewing | `Cmd/Ctrl++` or `Cmd/Ctrl+=` | Zoom in |
+| Viewing | `Cmd/Ctrl+-` | Zoom out |
+| Viewing | `Cmd/Ctrl+0` | Reset zoom to 100% |
+| Viewing | `F` | Fit window to diagram |
+| Viewing | `S` | Toggle auto-scale |
+| Viewing | Double-click | Fit window to diagram |
+| Viewing | Pinch gesture | Zoom in or out on trackpad |
+| Clipboard | `Cmd/Ctrl+C` | Copy rendered image with white background |
+| Clipboard | `Cmd/Ctrl+Alt+C` | Copy rendered image with transparency |
+| Clipboard | `Cmd/Ctrl+Shift+C` | Copy diagram source |
+| Format | `Cmd/Ctrl+F` | Toggle SVG and PNG |
 
-#### Clipboard Operations
-- **Cmd-C / Ctrl-C**: Copy rendered image to clipboard
-- **Cmd-Option-C / Ctrl-Alt-C**: Copy image with white background
-- **Cmd-Shift-C / Ctrl-Shift-C**: Copy diagram source code
+### Toolbar actions
 
-#### Format Control
-- **Cmd-F / Ctrl-F**: Toggle between SVG and PNG rendering
-
-### Toolbar Actions
-
-- **Toggle SVG/PNG**: Switch between SVG and PNG rendering formats
-- **Copy Image**: Copy the current high-DPI rendered image to clipboard
-- **Copy Source**: Copy the diagram source code to clipboard
-- **Reveal**: Open the source file location in file manager
+| Control | Action |
+| --- | --- |
+| `SVG` / `PNG` | Switch render format for current window |
+| `Copy` | Copy current render with transparency |
+| `White` | Copy current render with white background |
+| `Source` | Copy diagram source text |
+| `Error` | Copy full Kroki error response when render fails |
+| `Fit` | Resize window to fit current diagram |
+| `Reveal` | Open source file location in platform file manager |
