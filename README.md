@@ -53,10 +53,12 @@ uv run dacwatch --kroki-base=https://kroki.io <dir> [<dir2> ...]
 
 ### Diagram Rendering
 - Uses a Kroki service to render diagrams as SVG or PNG
-- Defaults to SVG, allows switching to PNG in each window
+- Defaults to SVG for Graphviz and PlantUML, and PNG for Mermaid for best Qt compatibility
+- Lets each preview window switch formats independently
 - High-DPI display support with 2x rendering on Retina displays
-- QScrollArea-based image display with automatic scrollbars
+- Zoomable graphics view with automatic scrollbars
 - Clean white background for better diagram visibility
+- Shows render errors inline and allows copying full Kroki error output
 
 ### User Interface
 - Toolbar with format toggle, copy, and file management buttons
