@@ -198,3 +198,11 @@ DaCWatch is already usable for day-to-day diagram previewing, but project still 
 - Support switching between multiple Kroki services
 - Add diagram validation before render
 - Expand integration, failure-mode, performance, and memory tests
+
+## Current limitations
+
+- DaCWatch requires a reachable Kroki endpoint to render anything
+- Syntax validation happens at render time, not before you edit or save
+- Preferences are not persisted yet
+- Multi-endpoint Kroki switching is not implemented yet
+- Screenshot-quality docs visuals are illustrative; final polished app capture workflow still needs manual curation
