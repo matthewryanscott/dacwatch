@@ -181,3 +181,14 @@ Tests use `pytest-qt` with `QT_QPA_PLATFORM=offscreen`, so widget behavior can b
 ### Current automated coverage
 - 177 collected tests across CLI, file watching, rendering, window management, clipboard, markdown parsing, and zoom behavior
 - `uv run dacwatch --help` provides the generated CLI reference
+
+## Project status
+
+DaCWatch is already usable for day-to-day diagram previewing, but project still in active polish phase.
+
+### Roadmap highlights
+- Improve in-window error display polish
+- Add user preferences and persisted settings
+- Support switching between multiple Kroki services
+- Add diagram validation before render
+- Expand integration, failure-mode, performance, and memory tests
