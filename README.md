@@ -80,7 +80,7 @@ uv run dacwatch --kroki-base=https://kroki.io <dir> [<dir2> ...]
 - **File Watching**: Async file watcher (tracks file creation, modification, deletion)
 - **Window Management**: Window manager with state persistence (tracks opened files and their windows)
 - **Rendering**: Kroki service client (DaC → SVG/PNG)
-- **Image Display**: QScrollArea-based viewer with high-DPI scaling
+- **Image Display**: QGraphicsView-based viewer with high-DPI scaling
 - **Clipboard**: High-DPI image copying with proper metadata preservation
 
 ## Usage
@@ -161,8 +161,8 @@ DaCWatch uses `Cmd` on macOS and `Ctrl` on Linux and Windows for standard shortc
 | Control | Action |
 | --- | --- |
 | `SVG` / `PNG` | Switch render format for current window |
-| `Copy` | Copy current render with transparency |
-| `White` | Copy current render with white background |
+| `📋 Image` | Copy current render with white background |
+| `📋 Transparent` | Copy current render with transparency |
 | `Source` | Copy diagram source text |
 | `Error` | Copy full Kroki error response when render fails |
 | `Fit` | Resize window to fit current diagram |
