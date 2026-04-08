@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test-and-build:
+    name: Test and build (macOS, Python 3.13)
+    runs-on: macos-latest
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Set up Python 3.13
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Sync dependencies
+        run: uv sync --group dev
+
+      - name: Verify CLI help
+        run: uv run dacwatch --help
+
+      - name: Run test suite
+        env:
+          QT_QPA_PLATFORM: offscreen
+        run: uv run pytest
+
+      - name: Build distribution artifacts
+        run: uv build
+
+      - name: Upload dist artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: dacwatch-dist
+          path: dist/*
