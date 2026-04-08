@@ -1,10 +1,49 @@
 import asyncio
-import typer
 from pathlib import Path
-from dacwatch.config import Config
+
+import aiohttp
+import typer
+
 from dacwatch.app import DaCWatchApp
+from dacwatch.config import Config
+from dacwatch.kroki_client import KrokiClient, KrokiError
 
 app = typer.Typer(name="dacwatch", help="DaCWatch - Diagram as Code File Watcher")
+
+
+def _format_kroki_startup_error(kroki_base: str, error: Exception) -> str:
+    """Return a friendly startup error for Kroki connectivity problems."""
+    lines = [
+        f"Could not reach a working Kroki service at {kroki_base}.",
+        "DaCWatch checks Kroki at startup so connection problems fail fast before the GUI starts.",
+    ]
+
+    if isinstance(error, KrokiError):
+        details = f"Kroki responded with HTTP {error.status} {error.reason}."
+        if error.body:
+            snippet = error.body.strip().splitlines()[0][:200]
+            details += f" Response: {snippet}"
+        lines.append(details)
+    else:
+        lines.append(f"Connection error: {error}")
+
+    lines.extend([
+        "",
+        "Try one of these:",
+        "- Start the bundled local Kroki stack: cd kroki-self-hosted && docker compose up -d",
+        "- Or use the public service explicitly: dacwatch --kroki-base=https://kroki.io <dir>",
+        "- Verify that the Kroki base URL is correct and reachable from this machine",
+    ])
+    return "\n".join(lines)
+
+
+async def validate_kroki_connection(kroki_base: str):
+    """Fail fast with a helpful message if Kroki is unreachable at startup."""
+    client = KrokiClient(kroki_base)
+    try:
+        await client.check_connection()
+    except (KrokiError, aiohttp.ClientError, TimeoutError, OSError) as exc:
+        raise RuntimeError(_format_kroki_startup_error(kroki_base, exc)) from exc
 
 
 @app.command(name="dacwatch")
@@ -26,6 +65,12 @@ def main(
     if dry_run:
         typer.echo("Dry run completed successfully")
         return
+
+    try:
+        asyncio.run(validate_kroki_connection(config.kroki_base))
+    except RuntimeError as exc:
+        typer.echo(str(exc))
+        raise typer.Exit(code=1)
 
     # Create the application
     dac_app = DaCWatchApp(config)

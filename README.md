@@ -50,6 +50,8 @@ cd ..
 uv run dacwatch <dir> [<dir2> ...]
 ```
 
+DaCWatch validates the Kroki connection at startup. If the local service is not running yet, start it with the Docker Compose command above and try again.
+
 ### Run with public Kroki
 ```bash
 uv run dacwatch --kroki-base=https://kroki.io <dir> [<dir2> ...]
@@ -239,8 +241,9 @@ DaCWatch is already usable for day-to-day diagram previewing, but project still 
 
 | Problem | What to check |
 | --- | --- |
+| App exits at startup with a Kroki error | Start the bundled local stack with `cd kroki-self-hosted && docker compose up -d`, or rerun with `--kroki-base=https://kroki.io` |
 | No preview window appears | Confirm file extension or Markdown fence language is supported and file lives under watched directory |
-| Error window appears | Check Kroki endpoint availability and copy error output from toolbar for exact response |
+| Error window appears after startup | Check Kroki endpoint availability and copy error output from toolbar for exact response |
 | Public Kroki feels slow | Switch to local Docker-backed Kroki on `http://localhost:48000` |
 | Reveal action behaves differently by OS | Verify local file manager integration on your platform |
 | Clipboard output looks blurry | Use PNG or white-background copy mode and test target app's paste behavior |

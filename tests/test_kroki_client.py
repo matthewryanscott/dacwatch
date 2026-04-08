@@ -1,8 +1,7 @@
 import pytest
-from unittest.mock import AsyncMock, Mock, patch
-from aiohttp import ClientError, ClientResponseError
+from unittest.mock import AsyncMock, MagicMock, patch
 import aiohttp
-from dacwatch.kroki_client import KrokiClient
+from dacwatch.kroki_client import KrokiClient, KrokiError
 
 
 class TestKrokiClient:
@@ -15,6 +14,7 @@ class TestKrokiClient:
     def test_init(self):
         """Test KrokiClient initialization."""
         assert self.client.base_url == "https://kroki.io"
+        assert self.client.request_timeout == 10.0
 
     def test_get_diagram_type_dot(self):
         """Test diagram type detection for .dot files."""
@@ -68,6 +68,45 @@ class TestKrokiClient:
         assert isinstance(result, bytes)
         assert len(result) > 0
         assert b"<svg" in result
+
+    @pytest.mark.asyncio
+    async def test_check_connection_uses_health_endpoint(self):
+        """Health check should validate Kroki with the /health endpoint."""
+        mock_response = AsyncMock()
+        mock_response.status = 200
+        mock_response.read = AsyncMock(return_value=b"ok")
+
+        mock_session = MagicMock()
+        mock_session.get.return_value.__aenter__.return_value = mock_response
+
+        with patch("dacwatch.kroki_client.aiohttp.ClientSession") as mock_client_session:
+            mock_client_session.return_value.__aenter__.return_value = mock_session
+
+            await self.client.check_connection()
+
+        mock_session.get.assert_called_once_with("https://kroki.io/health")
+        mock_response.read.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_check_connection_raises_kroki_error_for_unhealthy_response(self):
+        """Health check should surface HTTP failures from the /health endpoint."""
+        mock_response = AsyncMock()
+        mock_response.status = 503
+        mock_response.reason = "Service Unavailable"
+        mock_response.text = AsyncMock(return_value="starting up")
+
+        mock_session = MagicMock()
+        mock_session.get.return_value.__aenter__.return_value = mock_response
+
+        with patch("dacwatch.kroki_client.aiohttp.ClientSession") as mock_client_session:
+            mock_client_session.return_value.__aenter__.return_value = mock_session
+
+            with pytest.raises(KrokiError) as exc_info:
+                await self.client.check_connection()
+
+        assert exc_info.value.status == 503
+        assert exc_info.value.reason == "Service Unavailable"
+        assert exc_info.value.body == "starting up"
 
 
 def test_kroki_error_is_importable():

@@ -1,12 +1,16 @@
-import pytest
-from typer.testing import CliRunner
 import sys
 from pathlib import Path
+from unittest.mock import AsyncMock, patch
+
+import aiohttp
+import pytest
+from typer.testing import CliRunner
 
 # Add the project root to Python path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from dacwatch.main import app
+from dacwatch.kroki_client import KrokiError
+from dacwatch.main import app, validate_kroki_connection
 
 
 @pytest.fixture
@@ -65,3 +69,43 @@ def test_cli_invalid_kroki_base(runner, tmp_path):
     # Should fail with invalid URL
     assert result.exit_code == 1
     assert "Invalid kroki_base URL" in str(result.exception)
+
+
+@pytest.mark.asyncio
+async def test_validate_kroki_connection_success():
+    """Startup validation should pass when Kroki is reachable."""
+    with patch("dacwatch.main.KrokiClient.check_connection", new=AsyncMock()) as mock_check:
+        await validate_kroki_connection("https://kroki.io")
+
+    mock_check.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_validate_kroki_connection_surfaces_helpful_network_error():
+    """Startup validation should explain how to recover from connection failures."""
+    with patch(
+        "dacwatch.main.KrokiClient.check_connection",
+        new=AsyncMock(side_effect=aiohttp.ClientError("connection refused")),
+    ):
+        with pytest.raises(RuntimeError) as exc_info:
+            await validate_kroki_connection("http://localhost:48000")
+
+    message = str(exc_info.value)
+    assert "Could not reach a working Kroki service" in message
+    assert "docker compose up -d" in message
+    assert "https://kroki.io" in message
+
+
+@pytest.mark.asyncio
+async def test_validate_kroki_connection_surfaces_http_error_details():
+    """Startup validation should include Kroki HTTP error details."""
+    with patch(
+        "dacwatch.main.KrokiClient.check_connection",
+        new=AsyncMock(side_effect=KrokiError(502, "Bad Gateway", "upstream unavailable")),
+    ):
+        with pytest.raises(RuntimeError) as exc_info:
+            await validate_kroki_connection("https://broken.kroki.example")
+
+    message = str(exc_info.value)
+    assert "HTTP 502 Bad Gateway" in message
+    assert "upstream unavailable" in message
