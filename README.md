@@ -29,6 +29,15 @@ uv run dacwatch --kroki-base=https://kroki.io <dir> [<dir2> ...]
 
 ## Features
 
+### Supported files
+
+| Source | Detected as | Notes |
+| --- | --- | --- |
+| `.dot` | Graphviz | Rendered through Kroki |
+| `.puml`, `.plantuml` | PlantUML | Rendered through Kroki |
+| `.mermaid` | Mermaid | Defaults to PNG for best Qt compatibility |
+| `.md` fenced blocks | PlantUML, Mermaid, Graphviz | Watches supported code fences like ` ```plantuml `, ` ```mermaid `, and ` ```dot ` |
+
 ### File Watching
 - Watch multiple directories for changes
 - Watches for GraphViz (`.dot`), PlantUML (`.puml`, `.plantuml`), Mermaid (`.mermaid`)
