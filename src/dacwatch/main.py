@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from pathlib import Path
 
 import aiohttp
@@ -9,6 +10,22 @@ from dacwatch.config import Config
 from dacwatch.kroki_client import KrokiClient, KrokiError
 
 app = typer.Typer(name="dacwatch", help="DaCWatch - Diagram as Code File Watcher")
+logger = logging.getLogger(__name__)
+
+
+def configure_logging(*, verbose: bool = False, debug: bool = False) -> None:
+    """Configure application logging for CLI use."""
+    level = logging.WARNING
+    if verbose:
+        level = logging.INFO
+    if debug:
+        level = logging.DEBUG
+
+    logging.basicConfig(
+        level=level,
+        format="%(levelname)s %(name)s: %(message)s",
+        force=True,
+    )
 
 
 def _format_kroki_startup_error(kroki_base: str, error: Exception) -> str:
@@ -51,10 +68,14 @@ def main(
     directories: list[Path] = typer.Argument(..., help="Directories to watch for diagram files"),
     kroki_base: str = typer.Option("http://localhost:48000", help="Kroki service base URL"),
     dry_run: bool = typer.Option(False, help="Dry run - validate config and exit"),
+    verbose: bool = typer.Option(False, "--verbose", help="Show informational logs"),
+    debug: bool = typer.Option(False, "--debug", help="Show debug logs"),
 ):
     """
     Watch directories for diagram files and render them using Kroki service.
     """
+    configure_logging(verbose=verbose, debug=debug)
+
     # Create configuration from CLI arguments
     config = Config.from_cli_args(directories, kroki_base)
 
@@ -104,7 +125,7 @@ def main(
 
     # Set up signal handler for graceful shutdown
     def signal_handler(signum, frame):
-        print("\nReceived interrupt signal, shutting down...")
+        logger.info("Received interrupt signal, shutting down")
         # Schedule cleanup on the event loop instead of exiting immediately
         loop.create_task(shutdown())
 
@@ -129,8 +150,8 @@ def main(
     dac_app.qt_app = qt_app  # type: ignore
 
     try:
-        print("DaCWatch starting...")
-        print("DaCWatch is now running. Close the windows or press Ctrl+C to stop.")
+        logger.info("DaCWatch starting")
+        logger.info("DaCWatch is now running. Close the windows or press Ctrl+C to stop.")
 
         # Start the application using the qasync loop
         loop.create_task(dac_app.start())

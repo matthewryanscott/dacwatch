@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from pathlib import Path
 from typing import Optional, Dict, Any, Set
 from watchdog.observers import Observer
@@ -6,6 +7,8 @@ from watchdog.events import FileSystemEventHandler
 
 from .config import Config
 from .file_type import is_supported_file
+
+logger = logging.getLogger(__name__)
 
 
 class AsyncEventHandler(FileSystemEventHandler):
@@ -37,13 +40,13 @@ class AsyncEventHandler(FileSystemEventHandler):
                     def run_in_thread():
                         try:
                             asyncio.run(self.file_watcher.handle_file_event(event_data))
-                        except Exception as e:
-                            print(f"Error processing file event: {e}")
+                        except Exception:
+                            logger.exception("Error processing file event in fallback thread")
                     
                     thread = threading.Thread(target=run_in_thread, daemon=True)
                     thread.start()
-        except Exception as e:
-            print(f"Error scheduling async task: {e}")
+        except Exception:
+            logger.exception("Error scheduling async task for file watcher event")
 
     def on_created(self, event):
         """Handle file creation events."""
@@ -239,7 +242,7 @@ class FileWatcher:
         """Process a single file event."""
         file_path_obj = Path(file_path)
 
-        print(f"Processed file event: {event_type} - {file_path_obj}")
+        logger.debug("Processed file event: %s - %s", event_type, file_path_obj)
 
         # Call the event callback if provided
         if self.event_callback:

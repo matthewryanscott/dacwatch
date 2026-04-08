@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from typing import Optional
 from queue import Queue
 import threading
@@ -11,6 +12,8 @@ from .file_watcher import FileWatcher
 from .window_manager import WindowManager
 from .kroki_client import KrokiClient, KrokiError
 from .markdown_parser import is_markdown_file, extract_diagram_blocks
+
+logger = logging.getLogger(__name__)
 
 # Diagram types whose SVG uses <foreignObject> (unsupported by Qt's QSvgRenderer)
 _PNG_DEFAULT_TYPES = frozenset({"mermaid"})
@@ -33,8 +36,8 @@ class DaCWatchApp:
         """Start the application."""
         self.is_running = True
         dirs = ", ".join(str(d) for d in self.config.directories)
-        print(f"DaCWatch starting - watching directories: {dirs}")
-        print(f"Using Kroki service: {self.config.kroki_base}")
+        logger.info("DaCWatch starting - watching directories: %s", dirs)
+        logger.info("Using Kroki service: %s", self.config.kroki_base)
 
         # Initialize Qt application with high-DPI support
         if QApplication.instance() is None:
@@ -89,7 +92,7 @@ class DaCWatchApp:
         if self.file_watcher:
             await self.file_watcher.stop()
 
-        print("DaCWatch stopped")
+        logger.info("DaCWatch stopped")
 
     async def _handle_file_event(self, event_type: str, file_path: str):
         """Handle file events by creating/updating windows and rendering diagrams."""
@@ -130,8 +133,8 @@ class DaCWatchApp:
                 # Render and display the diagram
                 try:
                     await self._render_and_display_diagram(file_path, window)
-                except Exception as e:
-                    print(f"Error rendering diagram for {file_path}: {e}")
+                except Exception:
+                    logger.exception("Error rendering diagram for %s", file_path)
 
         elif event_type == 'deleted':
             # Clean up window for deleted file
@@ -148,7 +151,7 @@ class DaCWatchApp:
             with open(file_path, 'r', encoding='utf-8') as f:
                 content = f.read()
         except FileNotFoundError:
-            print(f"Markdown file not found: {file_path}")
+            logger.warning("Markdown file not found: %s", file_path)
             return
 
         blocks = extract_diagram_blocks(content)
@@ -184,8 +187,12 @@ class DaCWatchApp:
                 try:
                     fmt = self._default_format(block.diagram_type)
                     await self._render_and_display(block.source, block.diagram_type, window, fmt)
-                except Exception as e:
-                    print(f"Error rendering markdown block {block.index} from {file_path}: {e}")
+                except Exception:
+                    logger.exception(
+                        "Error rendering markdown block %s from %s",
+                        block.index,
+                        file_path,
+                    )
 
     async def _render_markdown_block(self, file_path: str, block_index: int, window, format: str = "svg"):
         """Re-read and re-parse a markdown file to render a specific block (for format toggle)."""
@@ -207,7 +214,7 @@ class DaCWatchApp:
     async def _render_and_display_diagram(self, file_path: str, window, format: str | None = None):
         """Read a diagram file and render it in the window."""
         if not self.kroki_client:
-            print(f"Kroki client not available")
+            logger.warning("Kroki client not available")
             return
 
         try:
@@ -218,7 +225,7 @@ class DaCWatchApp:
             # Determine diagram type
             diagram_type = self.kroki_client.get_diagram_type(file_path)
             if not diagram_type:
-                print(f"Unsupported file type for {file_path}")
+                logger.warning("Unsupported file type for %s", file_path)
                 return
 
             if format is None:
@@ -227,7 +234,7 @@ class DaCWatchApp:
             await self._render_and_display(source_code, diagram_type, window, format)
 
         except FileNotFoundError:
-            print(f"File not found: {file_path}")
+            logger.warning("File not found: %s", file_path)
             window.display_error("File not found", f"Could not read file: {file_path}", f"File not found: {file_path}")
 
     async def _render_and_display(self, source: str, diagram_type: str, window, format: str = "svg"):
@@ -274,8 +281,8 @@ class DaCWatchApp:
             while self.is_running:
                 await asyncio.sleep(1.0)
         except KeyboardInterrupt:
-            print("Received interrupt signal")
+            logger.info("Received interrupt signal")
         except asyncio.CancelledError:
-            print("Application cancelled")
+            logger.info("Application cancelled")
         finally:
             await self.stop()

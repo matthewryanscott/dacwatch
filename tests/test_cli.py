@@ -10,7 +10,7 @@ from typer.testing import CliRunner
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from dacwatch.kroki_client import KrokiError
-from dacwatch.main import app, validate_kroki_connection
+from dacwatch.main import app, configure_logging, validate_kroki_connection
 
 
 @pytest.fixture
@@ -24,9 +24,37 @@ def test_cli_help(runner):
     assert result.exit_code == 0
     assert "dacwatch" in result.output
     assert "--kroki-base" in result.output
+    assert "--verbose" in result.output
+    assert "--debug" in result.output
     assert "directories" in result.output.lower()
     assert "--help" in result.output
     assert "Kroki service" in result.output
+
+
+def test_configure_logging_defaults_to_warning():
+    """Logging should default to warning-level output."""
+    with patch("dacwatch.main.logging.basicConfig") as mock_basic_config:
+        configure_logging()
+
+    mock_basic_config.assert_called_once()
+    assert mock_basic_config.call_args.kwargs["level"] == 30
+    assert mock_basic_config.call_args.kwargs["force"] is True
+
+
+def test_configure_logging_verbose_sets_info_level():
+    """Verbose mode should enable info logs."""
+    with patch("dacwatch.main.logging.basicConfig") as mock_basic_config:
+        configure_logging(verbose=True)
+
+    assert mock_basic_config.call_args.kwargs["level"] == 20
+
+
+def test_configure_logging_debug_sets_debug_level():
+    """Debug mode should enable debug logs."""
+    with patch("dacwatch.main.logging.basicConfig") as mock_basic_config:
+        configure_logging(debug=True)
+
+    assert mock_basic_config.call_args.kwargs["level"] == 10
 
 
 def test_cli_with_directory(runner, tmp_path):

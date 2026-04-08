@@ -170,6 +170,12 @@ uv run dacwatch diagrams docs examples
 
 # Validate configuration without launching UI
 uv run dacwatch --dry-run diagrams
+
+# Show informational logs
+uv run dacwatch --verbose diagrams
+
+# Show detailed watcher/render debug logs
+uv run dacwatch --debug diagrams
 ```
 
 ### CLI options
@@ -179,6 +185,8 @@ uv run dacwatch --dry-run diagrams
 | `DIRECTORIES...` | One or more directories to watch | Required |
 | `--kroki-base TEXT` | Kroki service base URL | `http://localhost:48000` |
 | `--dry-run / --no-dry-run` | Validate config and exit without starting UI | `--no-dry-run` |
+| `--verbose` | Show informational startup and lifecycle logs | `off` |
+| `--debug` | Show detailed debugging logs, including file watcher events | `off` |
 
 Run `uv run dacwatch --help` for full Typer-generated help.
 
