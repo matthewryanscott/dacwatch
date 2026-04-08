@@ -5,6 +5,16 @@ build/
 dist/
 wheels/
 *.egg-info
+.pytest_cache/
 
 # Virtual environments
-.venv
+.venv/
+
+# Editor / local agent files
+.idea/
+.claude/
+.nwave/
+
+# Packaging / local runtime artifacts
+src/*.egg-info/
+test_watch_dir/

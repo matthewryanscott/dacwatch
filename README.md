@@ -14,6 +14,34 @@ DaCWatch watches diagram files, renders them through Kroki, and opens a desktop 
 uv sync
 ```
 
+### Optional: Install the CLI globally for local development
+If you want to invoke `dacwatch` from any directory without prefixing it with `uv run`, install this repo as an editable global tool:
+
+```bash
+uv tool install -e .
+```
+
+Then you can run:
+
+```bash
+dacwatch .
+dacwatch docs diagrams
+```
+
+To pick up local changes later, reinstall or upgrade the tool:
+
+```bash
+uv tool upgrade dacwatch
+```
+
+To remove it:
+
+```bash
+uv tool uninstall dacwatch
+```
+
+This is especially convenient if you want DaCWatch available everywhere while still developing it from this checkout.
+
 ### Run with self-hosted Kroki
 ```bash
 cd kroki-self-hosted

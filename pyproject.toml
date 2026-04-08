@@ -5,18 +5,38 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "dacwatch"
 version = "0.1.0"
-description = "DaCWatch - Diagram as Code File Watcher"
+description = "Live preview desktop app for diagrams-as-code files rendered through Kroki"
 readme = "README.md"
 license = "MIT"
 requires-python = ">=3.13"
+authors = [
+    { name = "Matthew Ryan Scott" },
+]
+keywords = ["diagram", "kroki", "graphviz", "plantuml", "mermaid", "pyside6"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Environment :: MacOS X",
+    "Environment :: X11 Applications :: Qt",
+    "Intended Audience :: Developers",
+    "Operating System :: MacOS",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Documentation",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Utilities",
+]
 dependencies = [
     "aiohttp>=3.12.15",
     "pyside6>=6.9.2",
-    "pytest>=8.4.1",
     "qasync>=0.28.0",
     "typer>=0.17.3",
     "watchdog>=6.0.0",
 ]
+
+[project.urls]
+Homepage = "https://github.com/matthewryanscott/dacwatch"
+Repository = "https://github.com/matthewryanscott/dacwatch"
+Issues = "https://github.com/matthewryanscott/dacwatch/issues"
 
 [project.scripts]
 dacwatch = "dacwatch.main:app"

@@ -2,6 +2,10 @@ version = 1
 revision = 3
 requires-python = ">=3.13"
 
+[options]
+exclude-newer = "2026-04-01T21:17:07.703268Z"
+exclude-newer-span = "P7D"
+
 [[package]]
 name = "aiohappyeyeballs"
 version = "2.6.1"
@@ -94,7 +98,6 @@ source = { editable = "." }
 dependencies = [
     { name = "aiohttp" },
     { name = "pyside6" },
-    { name = "pytest" },
     { name = "qasync" },
     { name = "typer" },
     { name = "watchdog" },
@@ -111,7 +114,6 @@ dev = [
 requires-dist = [
     { name = "aiohttp", specifier = ">=3.12.15" },
     { name = "pyside6", specifier = ">=6.9.2" },
-    { name = "pytest", specifier = ">=8.4.1" },
     { name = "qasync", specifier = ">=0.28.0" },
     { name = "typer", specifier = ">=0.17.3" },
     { name = "watchdog", specifier = ">=6.0.0" },
