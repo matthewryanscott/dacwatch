@@ -83,6 +83,29 @@ uv run dacwatch --kroki-base=https://kroki.io <dir> [<dir2> ...]
 
 ## Usage
 
+### Common commands
+
+```bash
+# Watch one directory
+uv run dacwatch diagrams
+
+# Watch several directories at once
+uv run dacwatch diagrams docs examples
+
+# Validate configuration without launching UI
+uv run dacwatch --dry-run diagrams
+```
+
+### CLI options
+
+| Option | Description | Default |
+| --- | --- | --- |
+| `DIRECTORIES...` | One or more directories to watch | Required |
+| `--kroki-base TEXT` | Kroki service base URL | `http://localhost:48000` |
+| `--dry-run / --no-dry-run` | Validate config and exit without starting UI | `--no-dry-run` |
+
+Run `uv run dacwatch --help` for full Typer-generated help.
+
 ### Recommended: Self-hosted Kroki (Docker)
 
 For best privacy and performance, run your own Kroki instance using the included Docker Compose setup:
