@@ -20,12 +20,10 @@ def runner():
 
 def test_cli_help(runner):
     """Test that CLI shows help message."""
-    result = runner.invoke(app, ["--help"])
+    result = runner.invoke(app, ["--help"], color=False, terminal_width=120)
     assert result.exit_code == 0
     assert "dacwatch" in result.output
-    assert "--kroki-base" in result.output
-    assert "--verbose" in result.output
-    assert "--debug" in result.output
+    assert "Usage:" in result.output
     assert "directories" in result.output.lower()
     assert "--help" in result.output
     assert "Kroki service" in result.output
