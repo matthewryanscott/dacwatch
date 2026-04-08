@@ -108,7 +108,7 @@ Run `uv run dacwatch --help` for full Typer-generated help.
 
 ### Recommended: Self-hosted Kroki (Docker)
 
-For best privacy and performance, run your own Kroki instance using the included Docker Compose setup:
+For best privacy, startup speed, and local-only rendering, run your own Kroki instance using the included Docker Compose setup:
 
 ```bash
 # Start the self-hosted Kroki service (runs on localhost:48000)
@@ -118,6 +118,8 @@ docker compose up -d
 # Run DaCWatch (uses localhost:48000 by default)
 uv run dacwatch <dir> [<dir2> ...]
 ```
+
+See [`kroki-self-hosted/README.md`](kroki-self-hosted/README.md) for more detail about local Kroki and Niolesk services.
 
 ### Alternative: Public Kroki Service
 
