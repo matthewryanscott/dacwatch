@@ -96,6 +96,14 @@ class FileWatcher:
         self.observer = None
         self.event_handler = None
 
+        # Dynamic watch tracking. watchdog observes directories only, so a
+        # file-watch observes the file's parent dir and is narrowed to the exact
+        # file via the filter in handle_file_event.
+        self.watched_dirs: Set[Path] = set()
+        self.watched_files: Set[Path] = set()
+        # Maps an observed directory -> its watchdog ObservedWatch handle.
+        self.watches: Dict[Path, Any] = {}
+
         # Event queue for debouncing
         self.event_queue = asyncio.Queue()
         self.pending_events: Dict[str, Set[str]] = {}  # file_path -> set of event types
@@ -113,11 +121,65 @@ class FileWatcher:
         self.event_handler = AsyncEventHandler(self, loop)
         self.observer = Observer()
         for directory in self.config.directories:
-            self.observer.schedule(self.event_handler, str(directory), recursive=True)
+            self.add_directory(directory)
+        for file in self.config.files:
+            self.add_file(file)
         self.observer.start()
 
         # Start the event processing task
         self.processing_task = asyncio.create_task(self._process_events())
+
+    def _ensure_observed(self, directory: Path):
+        """Schedule a watchdog watch for ``directory`` if not already observed."""
+        if directory in self.watches:
+            return
+        if self.observer is None:
+            return
+        self.watches[directory] = self.observer.schedule(
+            self.event_handler, str(directory), recursive=True
+        )
+
+    def _maybe_unobserve(self, directory: Path):
+        """Unschedule ``directory`` if no watched dir or file still needs it."""
+        if directory in self.watched_dirs:
+            return
+        if any(f.parent == directory for f in self.watched_files):
+            return
+        watch = self.watches.pop(directory, None)
+        if watch is not None and self.observer is not None:
+            self.observer.unschedule(watch)
+
+    def add_directory(self, directory: Path):
+        """Watch a directory recursively (idempotent)."""
+        directory = Path(directory).resolve()
+        self.watched_dirs.add(directory)
+        self._ensure_observed(directory)
+
+    def add_file(self, file: Path):
+        """Watch a single file by observing its parent dir and filtering to it."""
+        file = Path(file).resolve()
+        self.watched_files.add(file)
+        self._ensure_observed(file.parent)
+
+    def remove_directory(self, directory: Path):
+        """Stop watching a directory."""
+        directory = Path(directory).resolve()
+        self.watched_dirs.discard(directory)
+        self._maybe_unobserve(directory)
+
+    def remove_file(self, file: Path):
+        """Stop watching a single file."""
+        file = Path(file).resolve()
+        self.watched_files.discard(file)
+        self._maybe_unobserve(file.parent)
+
+    def _is_watched(self, file_path: Path) -> bool:
+        """A file event is relevant if the file is under a watched directory or
+        is itself an explicitly watched file."""
+        if file_path in self.watched_files:
+            return True
+        parents = set(file_path.parents)
+        return any(d == file_path or d in parents for d in self.watched_dirs)
 
 
 
@@ -150,11 +212,15 @@ class FileWatcher:
 
     async def handle_file_event(self, event: Dict[str, Any]):
         """Handle a file system event by queuing it for processing."""
-        file_path = Path(event['src_path'])
-        file_path_str = str(file_path)
+        file_path = Path(event['src_path']).resolve()
 
         # Only process supported file types
         if not is_supported_file(file_path):
+            return
+
+        # Narrow events to what we actually watch: files under a watched
+        # directory, or an exact file-watch (whose parent dir we observe).
+        if not self._is_watched(file_path):
             return
 
         # Add to queue for debounced processing

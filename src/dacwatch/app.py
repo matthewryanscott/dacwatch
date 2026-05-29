@@ -7,11 +7,15 @@ import aiohttp
 from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import QTimer, Qt
 from pathlib import Path
+from . import ipc
 from .config import Config
+from .file_type import is_supported_file
 from .file_watcher import FileWatcher
+from .ipc import decode_paths
 from .window_manager import WindowManager
 from .kroki_client import KrokiClient, KrokiError
 from .markdown_parser import is_markdown_file, extract_diagram_blocks
+from .watched_paths_window import WatchedPathsWindow
 
 logger = logging.getLogger(__name__)
 
@@ -31,6 +35,11 @@ class DaCWatchApp:
         self.qt_app: Optional[QApplication] = None
         self.event_queue = Queue()
         self.file_watcher_thread: Optional[threading.Thread] = None
+        self.ipc_server: Optional[asyncio.AbstractServer] = None
+        self.watched_paths_window: Optional[WatchedPathsWindow] = None
+        # Persistent, parentless menu bar so the Window menu stays reachable on
+        # macOS even when no diagram windows are open.
+        self._menu_bar = None
 
     async def start(self):
         """Start the application."""
@@ -55,9 +64,19 @@ class DaCWatchApp:
         # Setup application-level keyboard shortcuts
         self._setup_app_shortcuts()
 
+        # Persistent Window menu (reachable with no windows open on macOS)
+        self._setup_menu()
+
+        # Let the window manager open the Watched Paths window from its menus
+        self.window_manager.on_open_watched_paths = self._open_watched_paths_window
+
         # Start the file watcher
         self.file_watcher = FileWatcher(self.config, self._handle_file_event)
         await self.file_watcher.start()
+
+        # Start the single-instance IPC server so other CLI invocations can hand
+        # us their paths.
+        await self._start_ipc_server()
 
     def _setup_app_shortcuts(self):
         """Setup application-level keyboard shortcuts."""
@@ -84,9 +103,130 @@ class DaCWatchApp:
         if self.window_manager:
             self.window_manager.cycle_to_next_window(backward=backward)
 
+    # ------------------------------------------------------------------
+    # Single-instance IPC
+    # ------------------------------------------------------------------
+
+    async def _start_ipc_server(self):
+        """Listen on the Unix socket for paths sent by other CLI invocations.
+
+        Runs on the qasync/Qt loop, so the client handler can touch widgets and
+        the window manager directly without a thread bridge.
+        """
+        socket_path = ipc.SOCKET_PATH
+        socket_path.parent.mkdir(parents=True, exist_ok=True)
+        # Remove any stale socket left by a previous (dead) instance.
+        try:
+            socket_path.unlink()
+        except FileNotFoundError:
+            pass
+        self.ipc_server = await asyncio.start_unix_server(
+            self._handle_ipc_client, path=str(socket_path)
+        )
+        logger.info("IPC server listening on %s", socket_path)
+
+    async def _handle_ipc_client(self, reader, writer):
+        """Read newline-separated paths from a client and add each watch."""
+        try:
+            data = await reader.read()
+            for raw in decode_paths(data):
+                await self.add_watch_path(raw)
+        except Exception:
+            logger.exception("Error handling IPC client message")
+        finally:
+            writer.close()
+
+    async def add_watch_path(self, raw_path: str):
+        """Add a directory or file to the live watcher.
+
+        Directories register a recursive watch and render only on later changes;
+        files render immediately and then keep watching.
+        """
+        if not self.file_watcher:
+            return
+        path = Path(raw_path).resolve()
+        if path.is_dir():
+            self.file_watcher.add_directory(path)
+            logger.info("Now watching directory: %s", path)
+        elif path.is_file() and is_supported_file(path):
+            self.file_watcher.add_file(path)
+            logger.info("Now watching file: %s", path)
+            # Render the existing file immediately (reuses the change-event path,
+            # including markdown handling).
+            await self._handle_file_event("created", str(path))
+        else:
+            logger.warning("Ignoring unwatchable path: %s", path)
+            return
+        self._refresh_watched_paths_window()
+
+    def remove_watch_path(self, raw_path: str, kind: str):
+        """Stop watching a path (called from the Watched Paths window)."""
+        if not self.file_watcher:
+            return
+        path = Path(raw_path).resolve()
+        if kind == "directory":
+            self.file_watcher.remove_directory(path)
+        else:
+            self.file_watcher.remove_file(path)
+            if self.window_manager:
+                self.window_manager.cleanup_deleted_file(str(path))
+        logger.info("Stopped watching: %s", path)
+        self._refresh_watched_paths_window()
+
+    # ------------------------------------------------------------------
+    # Window menu + Watched Paths window
+    # ------------------------------------------------------------------
+
+    def _setup_menu(self):
+        """Create a persistent parentless menu bar with a Window menu.
+
+        On macOS this keeps the Window menu in the global menu bar even when no
+        diagram windows are open, so the Watched Paths window stays reachable.
+        """
+        from PySide6.QtGui import QAction, QKeySequence
+        from PySide6.QtWidgets import QMenuBar
+
+        self._menu_bar = QMenuBar()
+        window_menu = self._menu_bar.addMenu("Window")
+        action = QAction("Watched Paths…", self._menu_bar)
+        action.setShortcut(QKeySequence("Ctrl+Shift+P"))
+        action.triggered.connect(self._open_watched_paths_window)
+        window_menu.addAction(action)
+
+    def _open_watched_paths_window(self):
+        """Open (or focus) the Watched Paths window."""
+        if self.watched_paths_window is None:
+            self.watched_paths_window = WatchedPathsWindow(self)
+        self._refresh_watched_paths_window()
+        self.watched_paths_window.show()
+        self.watched_paths_window.raise_()
+        self.watched_paths_window.activateWindow()
+
+    def _refresh_watched_paths_window(self):
+        """Refresh the Watched Paths window if it exists."""
+        if self.watched_paths_window is None or not self.file_watcher:
+            return
+        self.watched_paths_window.refresh(
+            sorted(self.file_watcher.watched_dirs, key=str),
+            sorted(self.file_watcher.watched_files, key=str),
+        )
+
     async def stop(self):
         """Stop the application."""
         self.is_running = False
+
+        # Stop the IPC server and remove the socket
+        if self.ipc_server:
+            self.ipc_server.close()
+            try:
+                await self.ipc_server.wait_closed()
+            except Exception:
+                pass
+            self.ipc_server = None
+        try:
+            ipc.SOCKET_PATH.unlink()
+        except FileNotFoundError:
+            pass
 
         # Stop the file watcher
         if self.file_watcher:

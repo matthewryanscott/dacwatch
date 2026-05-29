@@ -354,3 +354,80 @@ async def test_render_markdown_block_removed(tmp_path):
     mock_window.display_error.assert_called_once()
 
     await app.stop()
+
+@pytest.mark.asyncio
+async def test_add_watch_path_file_renders_immediately(tmp_path):
+    """Adding a file watches it and renders it right away."""
+    directory = tmp_path / "d"
+    directory.mkdir()
+    config = Config(directories=[directory])
+    app = DaCWatchApp(config)
+
+    app.file_watcher = MagicMock()
+
+    mock_kroki = MagicMock()
+
+    async def fake_render(source, dtype, fmt="svg"):
+        return b'<svg>test</svg>'
+
+    mock_kroki.render_diagram = fake_render
+    mock_kroki.get_diagram_type.return_value = "graphviz"
+    app.kroki_client = mock_kroki
+
+    mock_wm = MagicMock()
+    mock_wm.get_or_create_window.return_value = MagicMock()
+    app.window_manager = mock_wm
+
+    dot = directory / "g.dot"
+    dot.write_text("digraph { a -> b }")
+
+    await app.add_watch_path(str(dot))
+
+    app.file_watcher.add_file.assert_called_once()
+    app.file_watcher.add_directory.assert_not_called()
+    mock_wm.get_or_create_window.assert_called_once_with(str(dot.resolve()))
+
+
+@pytest.mark.asyncio
+async def test_add_watch_path_directory_defers_render(tmp_path):
+    """Adding a directory registers the watch but renders nothing yet."""
+    directory = tmp_path / "d"
+    directory.mkdir()
+    config = Config(directories=[directory])
+    app = DaCWatchApp(config)
+
+    app.file_watcher = MagicMock()
+    app.kroki_client = MagicMock()
+    mock_wm = MagicMock()
+    app.window_manager = mock_wm
+
+    extra = tmp_path / "extra"
+    extra.mkdir()
+
+    await app.add_watch_path(str(extra))
+
+    app.file_watcher.add_directory.assert_called_once()
+    app.file_watcher.add_file.assert_not_called()
+    mock_wm.get_or_create_window.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_remove_watch_path_file_closes_window(tmp_path):
+    """Removing a watched file unschedules it and closes its window."""
+    directory = tmp_path / "d"
+    directory.mkdir()
+    config = Config(directories=[directory])
+    app = DaCWatchApp(config)
+
+    app.file_watcher = MagicMock()
+    mock_wm = MagicMock()
+    app.window_manager = mock_wm
+
+    dot = (directory / "g.dot")
+    dot.write_text("digraph { a -> b }")
+    resolved = str(dot.resolve())
+
+    app.remove_watch_path(resolved, "file")
+
+    app.file_watcher.remove_file.assert_called_once()
+    mock_wm.cleanup_deleted_file.assert_called_once_with(resolved)

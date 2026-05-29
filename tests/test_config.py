@@ -62,3 +62,50 @@ def test_config_from_cli_args(tmp_path):
 
     assert config.directories == [directory]
     assert config.kroki_base == kroki_base
+
+
+def test_config_accepts_file(tmp_path):
+    """A supported diagram file is accepted and classified as a file."""
+    diagram = tmp_path / "graph.dot"
+    diagram.write_text("digraph { a -> b }")
+
+    config = Config.from_cli_args([diagram])
+
+    assert config.directories == []
+    assert config.files == [diagram.resolve()]
+
+
+def test_config_mixes_dirs_and_files(tmp_path):
+    """Directories and files can be passed together."""
+    directory = tmp_path / "dir"
+    directory.mkdir()
+    diagram = tmp_path / "graph.mermaid"
+    diagram.write_text("graph TD; A-->B")
+
+    config = Config.from_cli_args([directory, diagram])
+
+    assert config.directories == [directory.resolve()]
+    assert config.files == [diagram.resolve()]
+
+
+def test_config_rejects_unsupported_file(tmp_path):
+    """A file with an unsupported extension is rejected."""
+    bad = tmp_path / "notes.txt"
+    bad.write_text("hello")
+
+    with pytest.raises(ValueError):
+        Config.from_cli_args([bad])
+
+
+def test_config_rejects_missing_path(tmp_path):
+    """A path that does not exist is rejected."""
+    missing = tmp_path / "nope.dot"
+
+    with pytest.raises(ValueError):
+        Config.from_cli_args([missing])
+
+
+def test_config_rejects_empty():
+    """At least one path must be specified."""
+    with pytest.raises(ValueError):
+        Config(directories=[], files=[])

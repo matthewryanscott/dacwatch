@@ -56,7 +56,10 @@ class DiagramWindow(QMainWindow):
 
         # Setup actions first (needed by toolbar)
         self._setup_actions()
-        
+
+        # Setup the Window menu (for opening the Watched Paths window)
+        self._setup_menubar()
+
         # Setup toolbar
         self._setup_toolbar()
         
@@ -65,6 +68,21 @@ class DiagramWindow(QMainWindow):
         
         # Setup toast notification
         self.toast = ToastWidget(self)
+
+    def _setup_menubar(self):
+        """Add a Window menu with an action to open the Watched Paths window."""
+        from PySide6.QtGui import QAction, QKeySequence
+
+        window_menu = self.menuBar().addMenu("Window")
+        watched_action = QAction("Watched Paths…", self)
+        watched_action.setShortcut(QKeySequence("Ctrl+Shift+P"))
+        watched_action.triggered.connect(self._open_watched_paths)
+        window_menu.addAction(watched_action)
+
+    def _open_watched_paths(self):
+        """Delegate to the app (via the window manager) to open Watched Paths."""
+        if self.window_manager and self.window_manager.on_open_watched_paths:
+            self.window_manager.on_open_watched_paths()
 
     def _schedule_focus(self):
         """Schedule focus to graphics view after UI updates settle."""
@@ -727,6 +745,8 @@ class WindowManager:
         self.windows: Dict[str, Any] = {}  # file_path -> window
         self.window_states: Dict[str, Dict[str, int]] = {}  # file_path -> state
         self.state_file_path = state_file_path or self._get_default_state_file_path()
+        # Set by the app so diagram windows can open the Watched Paths window.
+        self.on_open_watched_paths: Optional[Callable[[], None]] = None
         self.load_state()
 
     @property

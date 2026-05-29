@@ -1,5 +1,7 @@
 import asyncio
 import logging
+import subprocess
+import sys
 from pathlib import Path
 
 import aiohttp
@@ -7,6 +9,12 @@ import typer
 
 from dacwatch.app import DaCWatchApp
 from dacwatch.config import Config
+from dacwatch.ipc import (
+    SERVER_LOG_PATH,
+    DACWATCH_DIR,
+    try_send_to_running_instance,
+    wait_for_socket,
+)
 from dacwatch.kroki_client import KrokiClient, KrokiError
 
 app = typer.Typer(name="dacwatch", help="DaCWatch - Diagram as Code File Watcher")
@@ -65,34 +73,90 @@ async def validate_kroki_connection(kroki_base: str):
 
 @app.command(name="dacwatch")
 def main(
-    directories: list[Path] = typer.Argument(..., help="Directories to watch for diagram files"),
+    paths: list[Path] = typer.Argument(..., help="Directories or files to watch for diagrams"),
     kroki_base: str = typer.Option("http://localhost:48000", help="Kroki service base URL"),
     dry_run: bool = typer.Option(False, help="Dry run - validate config and exit"),
     verbose: bool = typer.Option(False, "--verbose", help="Show informational logs"),
     debug: bool = typer.Option(False, "--debug", help="Show debug logs"),
+    serve: bool = typer.Option(
+        False, "--serve", hidden=True,
+        help="Internal: run as the singleton server (used by the detached launch).",
+    ),
 ):
     """
-    Watch directories for diagram files and render them using Kroki service.
+    Watch directories and files for diagram-as-code and render them via Kroki.
+
+    The first invocation launches a detached singleton app; later invocations
+    hand their paths to that running instance and exit. When an instance is
+    already running, --kroki-base is ignored (the server keeps its own).
     """
     configure_logging(verbose=verbose, debug=debug)
 
-    # Create configuration from CLI arguments
-    config = Config.from_cli_args(directories, kroki_base)
+    # Create configuration from CLI arguments (resolves + validates paths)
+    config = Config.from_cli_args(paths, kroki_base)
 
     for d in config.directories:
         typer.echo(f"Watching directory: {d}")
+    for f in config.files:
+        typer.echo(f"Watching file: {f}")
     typer.echo(f"Using Kroki service: {config.kroki_base}")
 
     if dry_run:
         typer.echo("Dry run completed successfully")
         return
 
+    resolved = [str(p) for p in (config.directories + config.files)]
+
+    if serve:
+        _run_server(config)
+        return
+
+    # Hand off to an already-running instance, if any.
+    if try_send_to_running_instance(resolved):
+        typer.echo(f"Sent {len(resolved)} path(s) to the running DaCWatch instance.")
+        raise typer.Exit(0)
+
+    # No instance running. Validate Kroki in the foreground so connection
+    # problems fail fast (the detached server can't report errors to us here).
     try:
         asyncio.run(validate_kroki_connection(config.kroki_base))
     except RuntimeError as exc:
         typer.echo(str(exc))
         raise typer.Exit(code=1)
 
+    _launch_detached_server(resolved, config.kroki_base)
+
+
+def _launch_detached_server(resolved_paths: list[str], kroki_base: str) -> None:
+    """Spawn a detached singleton server, then wait until it is ready."""
+    DACWATCH_DIR.mkdir(parents=True, exist_ok=True)
+    log_file = open(SERVER_LOG_PATH, "w")
+    subprocess.Popen(
+        [sys.executable, "-m", "dacwatch.main", "--serve",
+         "--kroki-base", kroki_base, *resolved_paths],
+        start_new_session=True,
+        stdout=log_file,
+        stderr=subprocess.STDOUT,
+        close_fds=True,
+    )
+
+    if wait_for_socket(timeout=15.0):
+        typer.echo("DaCWatch started.")
+        raise typer.Exit(0)
+
+    typer.echo("Error: DaCWatch did not start within 15s.")
+    try:
+        tail = SERVER_LOG_PATH.read_text().strip().splitlines()[-20:]
+        if tail:
+            typer.echo("--- server.log (tail) ---")
+            typer.echo("\n".join(tail))
+    except OSError:
+        pass
+    raise typer.Exit(code=1)
+
+
+def _run_server(config: Config) -> None:
+    """Run the singleton server: the qasync/Qt event loop that owns the socket."""
     # Create the application
     dac_app = DaCWatchApp(config)
 
@@ -104,7 +168,6 @@ def main(
         return
 
     import signal
-    import sys
     from PySide6.QtWidgets import QApplication
     from PySide6.QtCore import QTimer
 

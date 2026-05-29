@@ -444,3 +444,104 @@ def test_file_watcher_flatten_events_method(tmp_path):
 
     # Test empty set
     assert watcher._flatten_events(set(), str(existing_file)) is None
+
+def test_is_watched_dir_and_file(tmp_path):
+    """_is_watched honors dir-watches (recursive) and exact file-watches."""
+    from dacwatch.file_watcher import FileWatcher
+    from dacwatch.config import Config
+
+    watched_dir = tmp_path / "watched"
+    watched_dir.mkdir()
+    nested = watched_dir / "sub"
+    nested.mkdir()
+
+    other_dir = tmp_path / "other"
+    other_dir.mkdir()
+    watched_file = other_dir / "only.dot"
+    watched_file.write_text("digraph { a -> b }")
+    sibling = other_dir / "sibling.dot"
+    sibling.write_text("digraph { c -> d }")
+
+    config = Config(directories=[watched_dir])
+    watcher = FileWatcher(config)
+    # Populate the dynamic sets without a running observer.
+    watcher.add_directory(watched_dir)
+    watcher.add_file(watched_file)
+
+    # Files under a watched directory (recursively) are watched.
+    assert watcher._is_watched((watched_dir / "a.dot").resolve())
+    assert watcher._is_watched((nested / "b.dot").resolve())
+    # The exact file-watch is watched, but its siblings are not.
+    assert watcher._is_watched(watched_file.resolve())
+    assert not watcher._is_watched(sibling.resolve())
+    # An unrelated path is not watched.
+    assert not watcher._is_watched((tmp_path / "elsewhere.dot").resolve())
+
+
+@pytest.mark.asyncio
+async def test_add_directory_and_file_register_watches(tmp_path):
+    """add_directory / add_file schedule watches on a running observer."""
+    from dacwatch.file_watcher import FileWatcher
+    from dacwatch.config import Config
+
+    base = tmp_path / "base"
+    base.mkdir()
+    config = Config(directories=[base])
+    watcher = FileWatcher(config)
+    await watcher.start()
+    try:
+        new_dir = tmp_path / "extra"
+        new_dir.mkdir()
+        watcher.add_directory(new_dir)
+        assert new_dir.resolve() in watcher.watched_dirs
+        assert new_dir.resolve() in watcher.watches
+
+        diagram = tmp_path / "stand_alone.dot"
+        diagram.write_text("digraph { a -> b }")
+        watcher.add_file(diagram)
+        assert diagram.resolve() in watcher.watched_files
+        # The file's parent directory is the thing actually observed.
+        assert diagram.resolve().parent in watcher.watches
+    finally:
+        await watcher.stop()
+
+
+@pytest.mark.asyncio
+async def test_remove_unschedules_when_unneeded(tmp_path):
+    """Removing the last consumer of an observed dir unschedules it."""
+    from dacwatch.file_watcher import FileWatcher
+    from dacwatch.config import Config
+
+    base = tmp_path / "base"
+    base.mkdir()
+    config = Config(directories=[base])
+    watcher = FileWatcher(config)
+    await watcher.start()
+    try:
+        # Two files in the same dir share one observed directory.
+        d = tmp_path / "shared"
+        d.mkdir()
+        f1 = d / "one.dot"
+        f1.write_text("digraph { a -> b }")
+        f2 = d / "two.dot"
+        f2.write_text("digraph { c -> d }")
+        watcher.add_file(f1)
+        watcher.add_file(f2)
+        assert d.resolve() in watcher.watches
+
+        # Removing one file keeps the shared dir observed.
+        watcher.remove_file(f1)
+        assert d.resolve() in watcher.watches
+        # Removing the last file unschedules the shared dir.
+        watcher.remove_file(f2)
+        assert d.resolve() not in watcher.watches
+
+        # Removing a directory unschedules it too.
+        extra = tmp_path / "extra"
+        extra.mkdir()
+        watcher.add_directory(extra)
+        assert extra.resolve() in watcher.watches
+        watcher.remove_directory(extra)
+        assert extra.resolve() not in watcher.watches
+    finally:
+        await watcher.stop()
