@@ -193,14 +193,31 @@ class DaCWatchApp:
         action.triggered.connect(self._open_watched_paths_window)
         window_menu.addAction(action)
 
+    @staticmethod
+    def _present_window(window):
+        """Show a window and bring it to the front.
+
+        Plain show() is enough for a foreground process, but the singleton
+        server runs detached in the background, where a window only surfaces if
+        it is also raised and activated.
+        """
+        from PySide6.QtCore import Qt
+
+        # Clear a possible minimized state so the window actually appears.
+        window.setWindowState(
+            (window.windowState() & ~Qt.WindowState.WindowMinimized)
+            | Qt.WindowState.WindowActive
+        )
+        window.show()
+        window.raise_()
+        window.activateWindow()
+
     def _open_watched_paths_window(self):
         """Open (or focus) the Watched Paths window."""
         if self.watched_paths_window is None:
             self.watched_paths_window = WatchedPathsWindow(self)
         self._refresh_watched_paths_window()
-        self.watched_paths_window.show()
-        self.watched_paths_window.raise_()
-        self.watched_paths_window.activateWindow()
+        self._present_window(self.watched_paths_window)
 
     def _refresh_watched_paths_window(self):
         """Refresh the Watched Paths window if it exists."""
@@ -255,7 +272,7 @@ class DaCWatchApp:
             # Create or get window for the file
             window = self.window_manager.get_or_create_window(file_path)
             if window:
-                window.show()  # Make sure the window is visible
+                self._present_window(window)  # Make sure the window is visible and frontmost
 
                 # Set up format toggle callback - use a safer approach that doesn't capture window directly
                 def create_format_callback(fp, wm):
@@ -310,7 +327,7 @@ class DaCWatchApp:
                 window_title=title,
             )
             if window:
-                window.show()
+                self._present_window(window)
 
                 # Set up format toggle callback for this block
                 def create_md_format_callback(fp, idx, wm):
