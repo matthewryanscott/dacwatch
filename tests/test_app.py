@@ -431,3 +431,58 @@ async def test_remove_watch_path_file_closes_window(tmp_path):
 
     app.file_watcher.remove_file.assert_called_once()
     mock_wm.cleanup_deleted_file.assert_called_once_with(resolved)
+
+
+def test_present_window_activate_false_only_shows():
+    """activate=False shows the window without raising/activating it."""
+    win = MagicMock()
+    DaCWatchApp._present_window(win, activate=False)
+    win.show.assert_called_once()
+    win.raise_.assert_not_called()
+    win.activateWindow.assert_not_called()
+
+
+def test_present_window_activate_true_foregrounds():
+    """activate=True shows, raises, and activates the window."""
+    win = MagicMock()
+    DaCWatchApp._present_window(win, activate=True)
+    win.show.assert_called_once()
+    win.raise_.assert_called_once()
+    win.activateWindow.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_diagram_foregrounds_only_on_first_render(tmp_path):
+    """First render foregrounds the app; re-renders update in place quietly."""
+    directory = tmp_path / "d"
+    directory.mkdir()
+    dot = directory / "g.dot"
+    dot.write_text("digraph { a -> b }")
+    config = Config(directories=[directory])
+    app = DaCWatchApp(config)
+
+    mock_kroki = MagicMock()
+
+    async def fake_render(source, dtype, fmt="svg"):
+        return b"<svg/>"
+
+    mock_kroki.render_diagram = fake_render
+    mock_kroki.get_diagram_type.return_value = "graphviz"
+    app.kroki_client = mock_kroki
+
+    win = MagicMock()
+    mock_wm = MagicMock()
+    mock_wm.get_or_create_window.return_value = win
+    app.window_manager = mock_wm
+    app._present_window = MagicMock()
+
+    # First render: no existing window -> foreground.
+    mock_wm.get_window_for_file.return_value = None
+    await app._handle_file_event("created", str(dot))
+    assert app._present_window.call_args.kwargs.get("activate") is True
+
+    # Re-render (e.g. save while editing): window exists -> no foreground.
+    mock_wm.get_window_for_file.return_value = win
+    app._present_window.reset_mock()
+    await app._handle_file_event("modified", str(dot))
+    assert app._present_window.call_args.kwargs.get("activate") is False

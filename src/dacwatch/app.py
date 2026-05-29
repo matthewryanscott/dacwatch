@@ -194,13 +194,18 @@ class DaCWatchApp:
         window_menu.addAction(action)
 
     @staticmethod
-    def _present_window(window):
-        """Show a window and bring it to the front.
+    def _present_window(window, activate: bool = True):
+        """Show a window, optionally bringing it (and the app) to the front.
 
-        Plain show() is enough for a foreground process, but the singleton
-        server runs detached in the background, where a window only surfaces if
-        it is also raised and activated.
+        With activate=True the window is raised and activated — used for a
+        diagram's first render so the app surfaces. With activate=False the
+        window is only shown (content updates in place), so re-renders from file
+        watching don't steal focus while you edit the source.
         """
+        if not activate:
+            window.show()
+            return
+
         from PySide6.QtCore import Qt
 
         # Clear a possible minimized state so the window actually appears.
@@ -269,10 +274,13 @@ class DaCWatchApp:
     async def _handle_diagram_event(self, event_type: str, file_path: str):
         """Handle events for regular diagram files (.dot, .puml, .mermaid)."""
         if event_type in ['created', 'modified']:
-            # Create or get window for the file
+            # Create or get window for the file. Only foreground the app on the
+            # first render (new window); re-renders from file watching update in
+            # place without stealing focus while you edit the source.
+            is_new = self.window_manager.get_window_for_file(file_path) is None
             window = self.window_manager.get_or_create_window(file_path)
             if window:
-                self._present_window(window)  # Make sure the window is visible and frontmost
+                self._present_window(window, activate=is_new)
 
                 # Set up format toggle callback - use a safer approach that doesn't capture window directly
                 def create_format_callback(fp, wm):
@@ -321,13 +329,16 @@ class DaCWatchApp:
         for block in blocks:
             window_key = f"{file_path}:{block.index}"
             title = f"DaCWatch - {md_name}:{block.index} ({block.diagram_type})"
+            # Only foreground when a block's window is first created; re-renders
+            # on save update in place without stealing focus.
+            is_new = self.window_manager.get_window_for_file(window_key) is None
             window = self.window_manager.get_or_create_window(
                 window_key,
                 actual_file_path=file_path,
                 window_title=title,
             )
             if window:
-                self._present_window(window)
+                self._present_window(window, activate=is_new)
 
                 # Set up format toggle callback for this block
                 def create_md_format_callback(fp, idx, wm):
