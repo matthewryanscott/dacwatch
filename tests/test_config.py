@@ -105,7 +105,8 @@ def test_config_rejects_missing_path(tmp_path):
         Config.from_cli_args([missing])
 
 
-def test_config_rejects_empty():
-    """At least one path must be specified."""
-    with pytest.raises(ValueError):
-        Config(directories=[], files=[])
+def test_config_allows_empty():
+    """An empty watch set is allowed (the server can start watching nothing)."""
+    config = Config(directories=[], files=[])
+    assert config.directories == []
+    assert config.files == []

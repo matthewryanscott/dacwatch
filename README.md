@@ -71,6 +71,22 @@ uv tool uninstall dacwatch
 
 This is especially convenient if you want DaCWatch available everywhere while still developing it from this checkout.
 
+### Optional: Build the macOS app (icon + menu-bar name)
+
+DaCWatch runs as a single instance: the first `dacwatch <path>` launches the app, and later
+invocations hand their paths to that running instance over a local socket. On macOS, building
+the `.app` bundle gives the running app its proper Dock icon and the "DaCWatch" menu-bar name,
+and lets it come to the foreground when a diagram opens:
+
+```bash
+./scripts/build_app.sh
+```
+
+This produces `dist/DaCWatch.app` from `resources/icon.png` (the bundle stays out of version
+control). The bundle runs the project's `.venv`, so keep `uv sync` up to date. Once built,
+`dacwatch <path>` launches via the bundle automatically; without it, DaCWatch falls back to a
+detached background process (same behavior, generic icon and name).
+
 ### 30-second first run
 
 ```bash

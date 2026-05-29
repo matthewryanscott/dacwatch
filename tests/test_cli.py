@@ -91,10 +91,10 @@ def test_cli_with_kroki_base(runner, tmp_path):
 
 
 def test_cli_missing_directory(runner):
-    """Test CLI fails when directory is not provided."""
+    """Test CLI fails when no directory or file is provided."""
     result = runner.invoke(app)
     assert result.exit_code != 0
-    assert "Missing argument" in result.output
+    assert "at least one directory or file" in result.output
 
 
 def test_cli_invalid_kroki_base(runner, tmp_path):

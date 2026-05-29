@@ -73,27 +73,29 @@ async def validate_kroki_connection(kroki_base: str):
 
 @app.command(name="dacwatch")
 def main(
-    paths: list[Path] = typer.Argument(..., help="Directories or files to watch for diagrams"),
+    paths: list[Path] = typer.Argument(None, help="Directories or files to watch for diagrams"),
     kroki_base: str = typer.Option("http://localhost:48000", help="Kroki service base URL"),
     dry_run: bool = typer.Option(False, help="Dry run - validate config and exit"),
     verbose: bool = typer.Option(False, "--verbose", help="Show informational logs"),
     debug: bool = typer.Option(False, "--debug", help="Show debug logs"),
     serve: bool = typer.Option(
         False, "--serve", hidden=True,
-        help="Internal: run as the singleton server (used by the detached launch).",
+        help="Internal: run as the singleton server (used by the launcher).",
     ),
 ):
     """
     Watch directories and files for diagram-as-code and render them via Kroki.
 
-    The first invocation launches a detached singleton app; later invocations
+    The first invocation launches the singleton DaCWatch app; later invocations
     hand their paths to that running instance and exit. When an instance is
     already running, --kroki-base is ignored (the server keeps its own).
     """
     configure_logging(verbose=verbose, debug=debug)
 
-    # Create configuration from CLI arguments (resolves + validates paths)
-    config = Config.from_cli_args(paths, kroki_base)
+    # Create configuration from CLI arguments (resolves + validates paths).
+    # The server may run with no paths (e.g. launched from the .app bundle);
+    # the client requires at least one.
+    config = Config.from_cli_args(paths or [], kroki_base)
 
     for d in config.directories:
         typer.echo(f"Watching directory: {d}")
@@ -105,11 +107,14 @@ def main(
         typer.echo("Dry run completed successfully")
         return
 
-    resolved = [str(p) for p in (config.directories + config.files)]
-
     if serve:
         _run_server(config)
         return
+
+    resolved = [str(p) for p in (config.directories + config.files)]
+    if not resolved:
+        typer.echo("Error: provide at least one directory or file to watch.")
+        raise typer.Exit(code=2)
 
     # Hand off to an already-running instance, if any.
     if try_send_to_running_instance(resolved):
@@ -117,42 +122,74 @@ def main(
         raise typer.Exit(0)
 
     # No instance running. Validate Kroki in the foreground so connection
-    # problems fail fast (the detached server can't report errors to us here).
+    # problems fail fast (the launched server can't report errors to us here).
     try:
         asyncio.run(validate_kroki_connection(config.kroki_base))
     except RuntimeError as exc:
         typer.echo(str(exc))
         raise typer.Exit(code=1)
 
-    _launch_detached_server(resolved, config.kroki_base)
+    _launch_server(resolved, config.kroki_base)
 
 
-def _launch_detached_server(resolved_paths: list[str], kroki_base: str) -> None:
-    """Spawn a detached singleton server, then wait until it is ready."""
+def find_app_bundle() -> Path | None:
+    """Locate DaCWatch.app, checking paths in priority order."""
+    # 1. Relative to the source tree: <project>/dist/DaCWatch.app
+    project_root = Path(__file__).resolve().parent.parent.parent
+    candidates = [
+        project_root / "dist" / "DaCWatch.app",
+        Path.home() / "Applications" / "DaCWatch.app",
+        Path("/Applications/DaCWatch.app"),
+    ]
+    for candidate in candidates:
+        if candidate.is_dir():
+            return candidate
+    return None
+
+
+def _launch_server(resolved_paths: list[str], kroki_base: str) -> None:
+    """Launch the singleton server, then deliver paths once it is ready.
+
+    Prefers the DaCWatch.app bundle (proper macOS app: menu-bar name, Dock
+    icon, foreground activation). Falls back to a detached python process when
+    the bundle has not been built.
+    """
     DACWATCH_DIR.mkdir(parents=True, exist_ok=True)
-    log_file = open(SERVER_LOG_PATH, "w")
-    subprocess.Popen(
-        [sys.executable, "-m", "dacwatch.main", "--serve",
-         "--kroki-base", kroki_base, *resolved_paths],
-        start_new_session=True,
-        stdout=log_file,
-        stderr=subprocess.STDOUT,
-        close_fds=True,
-    )
+    bundle = find_app_bundle()
 
-    if wait_for_socket(timeout=15.0):
-        typer.echo("DaCWatch started.")
-        raise typer.Exit(0)
+    if bundle is not None:
+        # `open --args` forwards args to the app's executable (our launcher,
+        # which already passes --serve). The bundle starts empty; paths are
+        # delivered over IPC below.
+        subprocess.run(["open", str(bundle), "--args", "--kroki-base", kroki_base])
+    else:
+        log_file = open(SERVER_LOG_PATH, "w")
+        subprocess.Popen(
+            [sys.executable, "-m", "dacwatch.main", "--serve",
+             "--kroki-base", kroki_base, *resolved_paths],
+            start_new_session=True,
+            stdout=log_file,
+            stderr=subprocess.STDOUT,
+            close_fds=True,
+        )
 
-    typer.echo("Error: DaCWatch did not start within 15s.")
-    try:
-        tail = SERVER_LOG_PATH.read_text().strip().splitlines()[-20:]
-        if tail:
-            typer.echo("--- server.log (tail) ---")
-            typer.echo("\n".join(tail))
-    except OSError:
-        pass
-    raise typer.Exit(code=1)
+    if not wait_for_socket(timeout=15.0):
+        typer.echo("Error: DaCWatch did not start within 15s.")
+        if bundle is None:
+            try:
+                tail = SERVER_LOG_PATH.read_text().strip().splitlines()[-20:]
+                if tail:
+                    typer.echo("--- server.log (tail) ---")
+                    typer.echo("\n".join(tail))
+            except OSError:
+                pass
+        raise typer.Exit(code=1)
+
+    # Deliver the initial paths over IPC. The bundle started empty; the python
+    # fallback already has them via argv, so a resend is harmless (idempotent).
+    try_send_to_running_instance(resolved_paths)
+    typer.echo("DaCWatch started.")
+    raise typer.Exit(0)
 
 
 def _run_server(config: Config) -> None:
@@ -180,6 +217,16 @@ def _run_server(config: Config) -> None:
     if not qt_app:
         typer.echo("Error: Could not create Qt application")
         return
+
+    # App identity: name shown in the menu bar (the .app bundle's CFBundleName
+    # is authoritative on macOS; this also covers the python-fallback launch and
+    # non-macOS) and the window/Dock icon.
+    from PySide6.QtGui import QIcon
+    qt_app.setApplicationName("DaCWatch")
+    qt_app.setApplicationDisplayName("DaCWatch")
+    icon_path = Path(__file__).resolve().parent.parent.parent / "resources" / "icon.png"
+    if icon_path.exists():
+        qt_app.setWindowIcon(QIcon(str(icon_path)))
 
     # Configure Qt to NOT quit when the last window is closed
     # We want to keep watching for files even when no windows are open

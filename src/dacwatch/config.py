@@ -19,9 +19,11 @@ class Config:
         self._validate_kroki_base()
 
     def _validate_paths(self):
-        """Validate that all watched directories and files exist and are usable."""
-        if not self.directories and not self.files:
-            raise ValueError("At least one directory or file must be specified")
+        """Validate that all watched directories and files exist and are usable.
+
+        An empty set is allowed: the singleton server can start watching nothing
+        (e.g. launched from the .app bundle) and receive paths later over IPC.
+        """
         for directory in self.directories:
             if not directory.exists():
                 raise ValueError(f"Directory does not exist: {directory}")
