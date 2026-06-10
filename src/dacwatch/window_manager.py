@@ -74,6 +74,12 @@ class DiagramWindow(QMainWindow):
         from PySide6.QtGui import QAction, QKeySequence
 
         window_menu = self.menuBar().addMenu("Window")
+
+        paste_action = QAction("Paste Diagram from Clipboard", self)
+        paste_action.setShortcut(QKeySequence("Ctrl+V"))
+        paste_action.triggered.connect(self._paste_diagram)
+        window_menu.addAction(paste_action)
+
         watched_action = QAction("Watched Paths…", self)
         watched_action.setShortcut(QKeySequence("Ctrl+Shift+P"))
         watched_action.triggered.connect(self._open_watched_paths)
@@ -83,6 +89,11 @@ class DiagramWindow(QMainWindow):
         """Delegate to the app (via the window manager) to open Watched Paths."""
         if self.window_manager and self.window_manager.on_open_watched_paths:
             self.window_manager.on_open_watched_paths()
+
+    def _paste_diagram(self):
+        """Delegate to the app (via the window manager) to paste a diagram."""
+        if self.window_manager and self.window_manager.on_paste_diagram:
+            self.window_manager.on_paste_diagram()
 
     def _schedule_focus(self):
         """Schedule focus to graphics view after UI updates settle."""
@@ -608,6 +619,11 @@ class DiagramWindow(QMainWindow):
         import os
         try:
             reveal_path = self.actual_file_path
+            # Clipboard-pasted diagrams have a synthetic key, not a real file.
+            if not os.path.exists(reveal_path):
+                if hasattr(self, 'toast') and self.toast:
+                    self.toast.show_toast("No file to reveal")
+                return
             if sys.platform == 'darwin':
                 # macOS: open -R reveals in Finder
                 subprocess.run(['open', '-R', reveal_path])
@@ -747,6 +763,8 @@ class WindowManager:
         self.state_file_path = state_file_path or self._get_default_state_file_path()
         # Set by the app so diagram windows can open the Watched Paths window.
         self.on_open_watched_paths: Optional[Callable[[], None]] = None
+        # Set by the app so diagram windows can paste a diagram from the clipboard.
+        self.on_paste_diagram: Optional[Callable[[], None]] = None
         self.load_state()
 
     @property

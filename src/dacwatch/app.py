@@ -8,7 +8,9 @@ from PySide6.QtWidgets import QApplication
 from PySide6.QtCore import QTimer, Qt
 from pathlib import Path
 from . import ipc
+from .clipboard import read_text_from_clipboard
 from .config import Config
+from .diagram_detect import detect_and_render, ordered_candidates
 from .file_type import is_supported_file
 from .file_watcher import FileWatcher
 from .ipc import decode_paths
@@ -37,6 +39,9 @@ class DaCWatchApp:
         self.file_watcher_thread: Optional[threading.Thread] = None
         self.ipc_server: Optional[asyncio.AbstractServer] = None
         self.watched_paths_window: Optional[WatchedPathsWindow] = None
+        # Monotonic counter for clipboard-pasted diagrams; each paste gets its
+        # own window keyed "clipboard:N".
+        self._clipboard_counter = 0
         # Persistent, parentless menu bar so the Window menu stays reachable on
         # macOS even when no diagram windows are open.
         self._menu_bar = None
@@ -69,6 +74,9 @@ class DaCWatchApp:
 
         # Let the window manager open the Watched Paths window from its menus
         self.window_manager.on_open_watched_paths = self._open_watched_paths_window
+
+        # Let diagram windows trigger a clipboard paste from their Window menu.
+        self.window_manager.on_paste_diagram = self._paste_diagram_from_clipboard
 
         # Start the file watcher
         self.file_watcher = FileWatcher(self.config, self._handle_file_event)
@@ -188,6 +196,12 @@ class DaCWatchApp:
 
         self._menu_bar = QMenuBar()
         window_menu = self._menu_bar.addMenu("Window")
+
+        paste_action = QAction("Paste Diagram from Clipboard", self._menu_bar)
+        paste_action.setShortcut(QKeySequence("Ctrl+V"))
+        paste_action.triggered.connect(self._paste_diagram_from_clipboard)
+        window_menu.addAction(paste_action)
+
         action = QAction("Watched Paths…", self._menu_bar)
         action.setShortcut(QKeySequence("Ctrl+Shift+P"))
         action.triggered.connect(self._open_watched_paths_window)
@@ -232,6 +246,105 @@ class DaCWatchApp:
             sorted(self.file_watcher.watched_dirs, key=str),
             sorted(self.file_watcher.watched_files, key=str),
         )
+
+    # ------------------------------------------------------------------
+    # Clipboard paste
+    # ------------------------------------------------------------------
+
+    def _paste_diagram_from_clipboard(self):
+        """Render the clipboard's text as a diagram in a new window.
+
+        Triggered by the Cmd+Shift+V menu action. Reads the clipboard, then
+        hands off to the async handler that detects the type and renders it.
+        """
+        source = read_text_from_clipboard()
+        if not source or not source.strip():
+            logger.info("Paste diagram: clipboard has no text")
+            from PySide6.QtWidgets import QApplication
+            QApplication.beep()
+            return
+        asyncio.create_task(self._handle_clipboard_paste(source))
+
+    async def _handle_clipboard_paste(self, source: str):
+        """Detect the diagram type of pasted source and render it in a window."""
+        if not self.window_manager or not self.kroki_client:
+            return
+
+        self._clipboard_counter += 1
+        n = self._clipboard_counter
+        window_key = f"clipboard:{n}"
+
+        try:
+            result = await detect_and_render(
+                self.kroki_client, source, self._default_format
+            )
+        except KrokiError as e:
+            window = self._create_clipboard_window(window_key, n, None)
+            window.source_code = source
+            self._present_window(window, activate=True)
+            window.display_error(
+                "Rendering error",
+                f"Kroki returned status {e.status} while detecting the diagram type.",
+                e.body,
+            )
+            return
+        except (aiohttp.ClientError, TimeoutError, OSError) as e:
+            window = self._create_clipboard_window(window_key, n, None)
+            window.source_code = source
+            self._present_window(window, activate=True)
+            window.display_error(
+                "Network error",
+                f"Could not connect to {self.config.kroki_base}",
+                str(e),
+            )
+            return
+
+        if result is None:
+            tried = ", ".join(ordered_candidates(source))
+            window = self._create_clipboard_window(window_key, n, None)
+            window.source_code = source
+            self._present_window(window, activate=True)
+            window.display_error(
+                "Could not detect diagram type",
+                f"The clipboard text was not valid as any known type ({tried}).",
+                source,
+            )
+            return
+
+        diagram_type, fmt, image_data = result
+        window = self._create_clipboard_window(window_key, n, diagram_type)
+        self._present_window(window, activate=True)
+
+        # We already have the rendered image from detection; display it directly
+        # and wire up the format toggle to re-render from the known type/source.
+        window.source_code = source
+        window.image_data = image_data
+        window.current_format = fmt
+        window.format_toggle_callback = self._make_clipboard_format_callback(
+            source, diagram_type, window_key
+        )
+        try:
+            window.display_image(image_data, fmt)
+        except Exception:
+            logger.exception("Error displaying pasted diagram %s", window_key)
+
+    def _create_clipboard_window(self, window_key: str, n: int, diagram_type: Optional[str]):
+        """Create a window for a pasted diagram with a friendly title."""
+        suffix = f" ({diagram_type})" if diagram_type else ""
+        title = f"DaCWatch - Clipboard {n}{suffix}"
+        return self.window_manager.get_or_create_window(
+            window_key, window_title=title
+        )
+
+    def _make_clipboard_format_callback(self, source: str, diagram_type: str, window_key: str):
+        """Build a format-toggle callback that re-renders pasted source."""
+        def format_callback(new_format):
+            current_window = self.window_manager.get_window_for_file(window_key)
+            if current_window:
+                asyncio.create_task(
+                    self._render_and_display(source, diagram_type, current_window, new_format)
+                )
+        return format_callback
 
     async def stop(self):
         """Stop the application."""

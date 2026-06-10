@@ -160,6 +160,7 @@ uv run dacwatch --kroki-base=https://kroki.io <dir> [<dir2> ...]
 - Copy rendered image to clipboard with high-DPI metadata preservation
 - Copy diagram source code to clipboard
 - Proper device pixel ratio handling for crisp pasted images
+- Paste diagram source from the clipboard (`Cmd/Ctrl+V`) to render it in a new window — no file needed. The diagram type is auto-detected by trying the source against the supported Kroki types (Mermaid, PlantUML, Graphviz) until one renders.
 
 ## Architecture
 
@@ -252,6 +253,7 @@ DaCWatch uses `Cmd` on macOS and `Ctrl` on Linux and Windows for standard shortc
 | Clipboard | `Cmd/Ctrl+C` | Copy rendered image with white background |
 | Clipboard | `Cmd/Ctrl+Alt+C` | Copy rendered image with transparency |
 | Clipboard | `Cmd/Ctrl+Shift+C` | Copy diagram source |
+| Clipboard | `Cmd/Ctrl+V` | Paste clipboard source as a new diagram (auto-detects type) |
 | Format | `Cmd/Ctrl+F` | Toggle SVG and PNG |
 
 ### Toolbar actions

@@ -1316,7 +1316,8 @@ class TestDiagramWindowToolbar:
         """Test reveal in finder functionality."""
         from unittest.mock import patch, Mock
 
-        with patch('subprocess.run') as mock_subprocess:
+        with patch('subprocess.run') as mock_subprocess, \
+                patch('os.path.exists', return_value=True):
             # Create a mock window object
             mock_window = Mock()
             mock_window.file_path = "/path/to/test/file.dot"
@@ -1331,6 +1332,46 @@ class TestDiagramWindowToolbar:
 
             # Verify subprocess.run was called with correct arguments (uses actual_file_path)
             mock_subprocess.assert_called_once_with(['open', '-R', "/path/to/test/file.dot"])
+
+    def test_window_menu_has_paste_action(self, qtbot):
+        """The diagram window's Window menu exposes a Cmd+Shift+V paste action
+        that delegates to the window manager's on_paste_diagram callback."""
+        from PySide6.QtGui import QAction
+        from dacwatch.window_manager import DiagramWindow, WindowManager
+
+        wm = WindowManager(state_file_path="/tmp/_dacw_paste_state.json")
+        fired = []
+        wm.on_paste_diagram = lambda: fired.append(True)
+
+        window = DiagramWindow("clipboard:1", window_manager=wm)
+        qtbot.addWidget(window)
+
+        paste = next(
+            (a for a in window.findChildren(QAction)
+             if a.text() == "Paste Diagram from Clipboard"),
+            None,
+        )
+        assert paste is not None
+        assert paste.shortcut().toString() == "Ctrl+V"
+
+        paste.trigger()
+        assert fired == [True]
+
+    def test_reveal_skips_when_path_missing(self):
+        """Reveal is a no-op for synthetic paths (e.g. clipboard:N) with no file."""
+        from unittest.mock import patch, Mock
+
+        with patch('subprocess.run') as mock_subprocess, \
+                patch('os.path.exists', return_value=False):
+            mock_window = Mock()
+            mock_window.actual_file_path = "clipboard:1"
+
+            from dacwatch.window_manager import DiagramWindow
+            mock_window.reveal_in_finder = DiagramWindow.reveal_in_finder.__get__(mock_window, DiagramWindow)
+
+            mock_window.reveal_in_finder()
+
+            mock_subprocess.assert_not_called()
 
 
 class TestDiagramWindowHighDPI:
@@ -1989,7 +2030,8 @@ class TestMarkdownWindows:
         """Test that reveal_in_finder uses actual_file_path."""
         from dacwatch.window_manager import DiagramWindow
 
-        with patch('subprocess.run') as mock_subprocess:
+        with patch('subprocess.run') as mock_subprocess, \
+                patch('os.path.exists', return_value=True):
             mock_window = Mock()
             mock_window.actual_file_path = "/path/to/doc.md"
             mock_window.reveal_in_finder = DiagramWindow.reveal_in_finder.__get__(mock_window, DiagramWindow)

@@ -28,3 +28,8 @@ def copy_pixmap_to_clipboard(pixmap: QPixmap, white_background: bool = False) ->
 def copy_text_to_clipboard(text: str) -> None:
     """Copy text to the system clipboard."""
     QApplication.clipboard().setText(text)
+
+
+def read_text_from_clipboard() -> str:
+    """Return the current text contents of the system clipboard (may be empty)."""
+    return QApplication.clipboard().text()

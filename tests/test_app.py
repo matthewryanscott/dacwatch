@@ -486,3 +486,140 @@ async def test_diagram_foregrounds_only_on_first_render(tmp_path):
     app._present_window.reset_mock()
     await app._handle_file_event("modified", str(dot))
     assert app._present_window.call_args.kwargs.get("activate") is False
+
+
+def _make_app_with_mock_render(tmp_path, render_impl, default_format="svg"):
+    """Build a DaCWatchApp with a mocked kroki client and window manager."""
+    directory = tmp_path / "d"
+    directory.mkdir()
+    config = Config(directories=[directory])
+    app = DaCWatchApp(config)
+
+    mock_kroki = MagicMock()
+    mock_kroki.render_diagram = render_impl
+    app.kroki_client = mock_kroki
+
+    win = MagicMock()
+    mock_wm = MagicMock()
+    mock_wm.get_or_create_window.return_value = win
+    mock_wm.get_window_for_file.return_value = win
+    app.window_manager = mock_wm
+    app._present_window = MagicMock()
+    return app, mock_wm, win
+
+
+@pytest.mark.asyncio
+async def test_clipboard_paste_detects_and_renders(tmp_path):
+    """Pasting mermaid source detects the type and displays the image."""
+    from dacwatch.kroki_client import KrokiError
+
+    async def fake_render(source, dtype, fmt="svg"):
+        if dtype == "mermaid":
+            return b"PNGDATA"
+        raise KrokiError(400, "Bad", "nope")
+
+    app, mock_wm, win = _make_app_with_mock_render(tmp_path, fake_render)
+
+    await app._handle_clipboard_paste("flowchart TD\n A-->B")
+
+    # New window keyed clipboard:1 with a mermaid title, foregrounded.
+    args, kwargs = mock_wm.get_or_create_window.call_args
+    assert args[0] == "clipboard:1"
+    assert "mermaid" in kwargs["window_title"]
+    win.display_image.assert_called_once_with(b"PNGDATA", "png")
+    assert win.source_code == "flowchart TD\n A-->B"
+    assert app._present_window.call_args.kwargs.get("activate") is True
+
+
+@pytest.mark.asyncio
+async def test_clipboard_paste_increments_counter(tmp_path):
+    """Each paste opens a new window keyed clipboard:N."""
+    async def fake_render(source, dtype, fmt="svg"):
+        return b"DATA"
+
+    app, mock_wm, win = _make_app_with_mock_render(tmp_path, fake_render)
+
+    await app._handle_clipboard_paste("flowchart TD\n A-->B")
+    await app._handle_clipboard_paste("flowchart TD\n C-->D")
+
+    keys = [c.args[0] for c in mock_wm.get_or_create_window.call_args_list]
+    assert keys == ["clipboard:1", "clipboard:2"]
+
+
+@pytest.mark.asyncio
+async def test_clipboard_paste_no_type_match_shows_error(tmp_path):
+    """When no candidate type renders, an error window is shown."""
+    from dacwatch.kroki_client import KrokiError
+
+    async def fake_render(source, dtype, fmt="svg"):
+        raise KrokiError(400, "Bad", "syntax error")
+
+    app, mock_wm, win = _make_app_with_mock_render(tmp_path, fake_render)
+
+    await app._handle_clipboard_paste("not a real diagram")
+
+    win.display_error.assert_called_once()
+    assert "detect" in win.display_error.call_args.args[0].lower()
+    win.display_image.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_clipboard_paste_network_error_shows_error(tmp_path):
+    """A non-400 Kroki error surfaces as an error window, not a crash."""
+    from dacwatch.kroki_client import KrokiError
+
+    async def fake_render(source, dtype, fmt="svg"):
+        raise KrokiError(502, "Bad Gateway", "upstream down")
+
+    app, mock_wm, win = _make_app_with_mock_render(tmp_path, fake_render)
+
+    await app._handle_clipboard_paste("flowchart TD\n A-->B")
+
+    win.display_error.assert_called_once()
+    win.display_image.assert_not_called()
+
+
+def test_paste_from_clipboard_empty_is_noop(tmp_path):
+    """An empty clipboard beeps and does not spawn a paste task."""
+    directory = tmp_path / "d"
+    directory.mkdir()
+    config = Config(directories=[directory])
+    app = DaCWatchApp(config)
+
+    with patch("dacwatch.app.read_text_from_clipboard", return_value="   "), \
+            patch("asyncio.create_task") as mock_create_task:
+        app._paste_diagram_from_clipboard()
+        mock_create_task.assert_not_called()
+
+
+def test_paste_from_clipboard_spawns_task(tmp_path, qapp):
+    """Non-empty clipboard text spawns the async paste handler."""
+    directory = tmp_path / "d"
+    directory.mkdir()
+    config = Config(directories=[directory])
+    app = DaCWatchApp(config)
+
+    with patch("dacwatch.app.read_text_from_clipboard", return_value="flowchart TD\n A-->B"), \
+            patch("asyncio.create_task") as mock_create_task:
+        app._paste_diagram_from_clipboard()
+        mock_create_task.assert_called_once()
+        # Close the unawaited coroutine handed to the mocked create_task.
+        mock_create_task.call_args.args[0].close()
+
+
+def test_setup_menu_has_paste_action(tmp_path, qapp):
+    """The persistent menu bar exposes a Cmd+Shift+V paste action."""
+    from PySide6.QtGui import QAction
+
+    directory = tmp_path / "d"
+    directory.mkdir()
+    app = DaCWatchApp(Config(directories=[directory]))
+    app._setup_menu()
+
+    paste = next(
+        (a for a in app._menu_bar.findChildren(QAction)
+         if a.text() == "Paste Diagram from Clipboard"),
+        None,
+    )
+    assert paste is not None
+    assert paste.shortcut().toString() == "Ctrl+V"
