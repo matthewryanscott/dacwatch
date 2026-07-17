@@ -126,11 +126,12 @@ uv run dacwatch --kroki-base=https://kroki.io <dir> [<dir2> ...]
 | `.dot` | Graphviz | Rendered through Kroki |
 | `.puml`, `.plantuml` | PlantUML | Rendered through Kroki |
 | `.mermaid` | Mermaid | Defaults to PNG for best Qt compatibility |
+| `.petrinet` | Velocitron Petri net | Optional: needs the `velocitron-viz` CLI on PATH (checked at startup); transformed to Graphviz DOT, then rendered through Kroki |
 | `.md` fenced blocks | PlantUML, Mermaid, Graphviz | Watches supported code fences like ` ```plantuml `, ` ```mermaid `, and ` ```dot ` |
 
 ### File Watching
 - Watch multiple directories for changes
-- Watches Graphviz (`.dot`), PlantUML (`.puml`, `.plantuml`), Mermaid (`.mermaid`), and Markdown files with supported diagram fences
+- Watches Graphviz (`.dot`), PlantUML (`.puml`, `.plantuml`), Mermaid (`.mermaid`), Velocitron Petri net (`.petrinet`, when `velocitron-viz` is installed), and Markdown files with supported diagram fences
 - Opens a new preview window when a new diagram appears
 - Re-renders an existing preview window when a watched diagram changes
 - Closes the preview window when the source diagram is deleted

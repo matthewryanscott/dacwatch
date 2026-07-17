@@ -11,8 +11,14 @@ from . import ipc
 from .clipboard import read_text_from_clipboard
 from .config import Config
 from .diagram_detect import detect_and_render, ordered_candidates
-from .file_type import is_supported_file
+from .file_type import get_diagram_type, is_supported_file
 from .file_watcher import FileWatcher
+from .petrinet import (
+    PetrinetTransformError,
+    is_petrinet_supported,
+    petrinet_to_dot,
+    velocitron_viz_path,
+)
 from .ipc import decode_paths
 from .window_manager import WindowManager
 from .kroki_client import KrokiClient, KrokiError
@@ -65,6 +71,16 @@ class DaCWatchApp:
 
         # Initialize the Kroki client
         self.kroki_client = KrokiClient(self.config.kroki_base)
+
+        # Optional .petrinet support: enabled when the velocitron-viz CLI is
+        # installed (it transforms .petrinet documents to Graphviz DOT).
+        if is_petrinet_supported():
+            logger.info(
+                "velocitron-viz found at %s - .petrinet files supported",
+                velocitron_viz_path(),
+            )
+        else:
+            logger.info("velocitron-viz not found - .petrinet files not supported")
 
         # Setup application-level keyboard shortcuts
         self._setup_app_shortcuts()
@@ -504,10 +520,24 @@ class DaCWatchApp:
                 source_code = f.read()
 
             # Determine diagram type
-            diagram_type = self.kroki_client.get_diagram_type(file_path)
+            diagram_type = get_diagram_type(Path(file_path))
             if not diagram_type:
                 logger.warning("Unsupported file type for %s", file_path)
                 return
+
+            # .petrinet renders as graphviz after a velocitron-viz transform
+            if diagram_type == "petrinet":
+                try:
+                    source_code = await petrinet_to_dot(file_path)
+                except PetrinetTransformError as e:
+                    window.source_code = source_code
+                    window.display_error(
+                        "Petri net transform error",
+                        "velocitron-viz could not transform the file.",
+                        e.detail or str(e),
+                    )
+                    return
+                diagram_type = "graphviz"
 
             if format is None:
                 format = self._default_format(diagram_type)

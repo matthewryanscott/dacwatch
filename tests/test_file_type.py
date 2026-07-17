@@ -81,3 +81,18 @@ def test_get_diagram_type_no_extension():
     """Test files without extension."""
     path = Path("diagram")
     assert get_diagram_type(path) is None
+
+
+def test_get_diagram_type_petrinet_supported(monkeypatch):
+    """Test .petrinet files map to petrinet when velocitron-viz is installed."""
+    monkeypatch.setattr("dacwatch.file_type.is_petrinet_supported", lambda: True)
+    assert get_diagram_type(Path("net.petrinet")) == "petrinet"
+    assert get_diagram_type(Path("net.PETRINET")) == "petrinet"
+    assert is_supported_file(Path("net.petrinet")) is True
+
+
+def test_get_diagram_type_petrinet_unsupported(monkeypatch):
+    """Test .petrinet files are unsupported when velocitron-viz is missing."""
+    monkeypatch.setattr("dacwatch.file_type.is_petrinet_supported", lambda: False)
+    assert get_diagram_type(Path("net.petrinet")) is None
+    assert is_supported_file(Path("net.petrinet")) is False

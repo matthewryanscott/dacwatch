@@ -623,3 +623,97 @@ def test_setup_menu_has_paste_action(tmp_path, qapp):
     )
     assert paste is not None
     assert paste.shortcut().toString() == "Ctrl+V"
+
+
+@pytest.mark.asyncio
+async def test_handle_petrinet_event_transforms_then_renders(tmp_path, monkeypatch):
+    """A .petrinet file is transformed to DOT and rendered as graphviz."""
+    directory = tmp_path / "test_dir"
+    directory.mkdir()
+    config = Config(directories=[directory])
+
+    net_file = directory / "net.petrinet"
+    net_file.write_text("petrinet v1\nplace p1\n")
+
+    monkeypatch.setattr("dacwatch.file_type.is_petrinet_supported", lambda: True)
+
+    transformed_paths = []
+
+    async def fake_to_dot(path):
+        transformed_paths.append(path)
+        return "digraph net { p1 }"
+
+    monkeypatch.setattr("dacwatch.app.petrinet_to_dot", fake_to_dot)
+
+    app = DaCWatchApp(config)
+    await app.start()
+
+    rendered = {}
+
+    async def fake_render(source, dtype, fmt="svg"):
+        rendered["source"] = source
+        rendered["type"] = dtype
+        rendered["format"] = fmt
+        return b"<svg>net</svg>"
+
+    mock_kroki = MagicMock()
+    mock_kroki.render_diagram = fake_render
+    app.kroki_client = mock_kroki
+
+    mock_wm = MagicMock()
+    mock_window = MagicMock()
+    mock_wm.get_or_create_window.return_value = mock_window
+    mock_wm.get_window_for_file.return_value = None
+    app.window_manager = mock_wm
+
+    await app._handle_file_event("created", str(net_file))
+
+    assert transformed_paths == [str(net_file)]
+    assert rendered["source"] == "digraph net { p1 }"
+    assert rendered["type"] == "graphviz"
+    mock_window.display_image.assert_called_once_with(b"<svg>net</svg>", "svg")
+
+    await app.stop()
+
+
+@pytest.mark.asyncio
+async def test_handle_petrinet_event_transform_error(tmp_path, monkeypatch):
+    """A failed velocitron-viz transform shows an error instead of rendering."""
+    from dacwatch.petrinet import PetrinetTransformError
+
+    directory = tmp_path / "test_dir"
+    directory.mkdir()
+    config = Config(directories=[directory])
+
+    net_file = directory / "bad.petrinet"
+    net_file.write_text("not a petrinet\n")
+
+    monkeypatch.setattr("dacwatch.file_type.is_petrinet_supported", lambda: True)
+
+    async def fake_to_dot(path):
+        raise PetrinetTransformError(
+            "velocitron-viz exited with status 2", "parse error: bad arc"
+        )
+
+    monkeypatch.setattr("dacwatch.app.petrinet_to_dot", fake_to_dot)
+
+    app = DaCWatchApp(config)
+    await app.start()
+
+    mock_kroki = MagicMock()
+    app.kroki_client = mock_kroki
+
+    mock_wm = MagicMock()
+    mock_window = MagicMock()
+    mock_wm.get_or_create_window.return_value = mock_window
+    mock_wm.get_window_for_file.return_value = None
+    app.window_manager = mock_wm
+
+    await app._handle_file_event("created", str(net_file))
+
+    mock_kroki.render_diagram.assert_not_called()
+    mock_window.display_image.assert_not_called()
+    mock_window.display_error.assert_called_once()
+    assert "parse error: bad arc" in mock_window.display_error.call_args.args[2]
+
+    await app.stop()
