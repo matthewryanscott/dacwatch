@@ -90,11 +90,24 @@ def test_cli_with_kroki_base(runner, tmp_path):
     assert "Dry run completed successfully" in result.output
 
 
-def test_cli_missing_directory(runner):
-    """Test CLI fails when no directory or file is provided."""
-    result = runner.invoke(app)
-    assert result.exit_code != 0
-    assert "at least one directory or file" in result.output
+def test_cli_bare_invocation_dry_run(runner):
+    """Bare dacwatch is valid: the GUI can open with an empty watch set."""
+    result = runner.invoke(app, ["--dry-run"])
+    assert result.exit_code == 0
+    assert "Dry run completed successfully" in result.output
+
+
+def test_cli_bare_invocation_launches_empty(runner):
+    """Bare dacwatch with nothing running launches the server with no paths."""
+    with (
+        patch("dacwatch.main.try_send_to_running_instance", return_value=False) as send,
+        patch("dacwatch.main._launch_server") as launch,
+        patch("dacwatch.main.asyncio.run"),
+    ):
+        result = runner.invoke(app)
+    assert result.exit_code == 0
+    send.assert_called_once_with([])
+    launch.assert_called_once_with([], "http://localhost:48000")
 
 
 def test_cli_invalid_kroki_base(runner, tmp_path):

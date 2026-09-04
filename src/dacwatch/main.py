@@ -89,12 +89,16 @@ def main(
     The first invocation launches the singleton DaCWatch app; later invocations
     hand their paths to that running instance and exit. When an instance is
     already running, --kroki-base is ignored (the server keeps its own).
+
+    Run bare (no paths) to open the GUI without watching anything — useful for
+    pasting a diagram from the clipboard. When an instance is already running,
+    a bare invocation is a no-op.
     """
     configure_logging(verbose=verbose, debug=debug)
 
     # Create configuration from CLI arguments (resolves + validates paths).
-    # The server may run with no paths (e.g. launched from the .app bundle);
-    # the client requires at least one.
+    # The server may run with no paths (bare CLI or launched from the .app
+    # bundle); there is no minimum watch set.
     config = Config.from_cli_args(paths or [], kroki_base)
 
     for d in config.directories:
@@ -110,16 +114,15 @@ def main(
     if serve:
         _run_server(config)
         return
-
     resolved = [str(p) for p in (config.directories + config.files)]
-    if not resolved:
-        typer.echo("Error: provide at least one directory or file to watch.")
-        raise typer.Exit(code=2)
-
     # Hand off to an already-running instance, if any.
     if try_send_to_running_instance(resolved):
-        typer.echo(f"Sent {len(resolved)} path(s) to the running DaCWatch instance.")
+        if resolved:
+            typer.echo(f"Sent {len(resolved)} path(s) to the running DaCWatch instance.")
+        else:
+            typer.echo("DaCWatch is already running.")
         raise typer.Exit(0)
+
 
     # No instance running. Validate Kroki in the foreground so connection
     # problems fail fast (the launched server can't report errors to us here).

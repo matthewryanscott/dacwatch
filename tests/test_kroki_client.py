@@ -9,11 +9,11 @@ class TestKrokiClient:
 
     def setup_method(self):
         """Set up test fixtures."""
-        self.client = KrokiClient("https://kroki.io")
+        self.client = KrokiClient("http://localhost:48000")
 
     def test_init(self):
         """Test KrokiClient initialization."""
-        assert self.client.base_url == "https://kroki.io"
+        assert self.client.base_url == "http://localhost:48000"
         assert self.client.request_timeout == 10.0
 
     def test_get_diagram_type_dot(self):
@@ -84,7 +84,7 @@ class TestKrokiClient:
 
             await self.client.check_connection()
 
-        mock_session.get.assert_called_once_with("https://kroki.io/health")
+        mock_session.get.assert_called_once_with("http://localhost:48000/health")
         mock_response.read.assert_awaited_once()
 
     @pytest.mark.asyncio
