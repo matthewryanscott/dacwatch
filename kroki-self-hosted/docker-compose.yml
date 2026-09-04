@@ -1,6 +1,6 @@
 services:
   kroki:
-    image: yuzutech/kroki:0.30.1
+    image: yuzutech/kroki:0.31.1
     ports:
       - "48000:8000"
     depends_on:
@@ -12,19 +12,20 @@ services:
       - KROKI_MERMAID_HOST=mermaid
       - KROKI_BPMN_HOST=bpmn
       - KROKI_EXCALIDRAW_HOST=excalidraw
+      - KROKI_MAX_URI_LENGTH=131072
   mermaid:
     restart: unless-stopped
-    image: yuzutech/kroki-mermaid:0.30.1
+    image: yuzutech/kroki-mermaid:0.31.1
     expose:
       - "8002"
   bpmn:
     restart: unless-stopped
-    image: yuzutech/kroki-bpmn:0.30.1
+    image: yuzutech/kroki-bpmn:0.31.1
     expose:
       - "8003"
   excalidraw:
     restart: unless-stopped
-    image: yuzutech/kroki-excalidraw:0.30.1
+    image: yuzutech/kroki-excalidraw:0.31.1
     expose:
       - "8004"
   niolesk:
